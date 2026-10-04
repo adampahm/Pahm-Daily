@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f4f7fb" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Fahmi Daily" />
+  <meta name="format-detection" content="telephone=no" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+  <link rel="icon" href="./icons/icon-192.png" />
+  <link rel="stylesheet" href="./styles.css" />
+  <title>Fahmi Daily</title>
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow" id="topEyebrow">Penjadwalan pribadi</p>
+        <h1 id="topTitle">Hari Ini</h1>
+      </div>
+      <button id="quickAddBtn" class="icon-btn primary-icon" aria-label="Tambah jadwal">＋</button>
+    </header>
+
+    <main class="content" id="mainContent">
+      <aside id="installHint" class="info-card hidden"><strong>Pasang Fahmi Daily ke iPhone:</strong><p>Tekan tombol Share → Add to Home Screen.</p><button class="soft-btn install-help">Cara Pasang di iPhone</button></aside>
+      <aside id="storageWarning" class="info-card hidden" role="alert"></aside>
+      <aside id="updateNotice" class="info-card hidden"><p>Versi baru siap. Simpan form dan buat backup sebelum memperbarui.</p><button id="updateBtn" class="soft-btn">Perbarui Aplikasi</button></aside>
+      <section id="todayPage" class="page active" aria-label="Hari Ini">
+        <div id="todayHero"></div>
+        <div class="section-head">
+          <div>
+            <h2>Agenda hari ini</h2>
+            <p id="todayDateLabel" class="muted"></p>
+          </div>
+        </div>
+        <div id="todayList" class="stack"></div><div id="statistics" class="info-card" aria-label="Statistik minggu ini"></div>
+      </section>
+
+      <section id="calendarPage" class="page" aria-label="Kalender">
+        <div class="toolbar-card">
+          <div class="segmented" id="calendarMode">
+            <button data-mode="day">Harian</button>
+            <button data-mode="week">Mingguan</button>
+            <button data-mode="month" class="active">Bulanan</button>
+          </div>
+          <div class="calendar-nav">
+            <button id="prevPeriodBtn" class="icon-btn" aria-label="Sebelumnya">‹</button>
+            <button id="todayNavBtn" class="soft-btn">Hari ini</button>
+            <button id="nextPeriodBtn" class="icon-btn" aria-label="Berikutnya">›</button>
+          </div>
+          <h2 id="calendarPeriodLabel" class="period-label"></h2>
+          <div class="search-filter-row">
+            <label class="search-box">
+              <span>⌕</span>
+              <input id="searchInput" type="search" placeholder="Cari kegiatan" autocomplete="off" />
+            </label>
+            <button id="filterBtn" class="soft-btn">Filter</button>
+          </div>
+          <div id="activeFilters" class="chips-row"></div>
+        </div>
+        <div id="calendarCanvas"></div>
+        <div class="section-head compact-top">
+          <div>
+            <h2 id="selectedDayTitle">Kegiatan</h2>
+            <p id="selectedDaySubtitle" class="muted"></p>
+          </div>
+        </div>
+        <div id="calendarAgenda" class="stack"></div>
+      </section>
+
+      <section id="settingsPage" class="page" aria-label="Pengaturan">
+        <div class="settings-group">
+          <h2>Pengingat</h2>
+          <div class="settings-card">
+            <div>
+              <strong>Notifikasi</strong>
+              <p class="muted small">Reminder lokal hanya diperiksa saat aplikasi aktif. Saat aplikasi ditutup atau iPhone terkunci, reminder tidak dijamin. Gunakan Tambahkan ke Kalender untuk kegiatan penting.</p>
+            </div>
+            <button id="notificationBtn" class="soft-btn">Aktifkan</button>
+          </div>
+          <div id="notificationStatus" class="inline-note"></div>
+          <div class="info-card"><strong>Tambahkan ke Kalender</strong><p>Buka menu ••• pada kegiatan, lalu pilih Tambahkan ke Kalender. File .ics berisi satu kejadian beserta alarm; perubahan jadwal tidak tersinkron otomatis.</p><p>Jika Kalender tidak muncul pada lembar Bagikan, simpan file dahulu. iOS tidak selalu dapat mengimpor .ics langsung dari Files/Safari. Apple mendukung impor lampiran .ics melalui Mail; pilihan ini memerlukan Anda mengirim file sendiri dan melibatkan layanan email. Untuk tetap sepenuhnya lokal, masukkan event secara manual di Kalender jika impor tidak tersedia. Aplikasi tidak mengirim email atau mengupload file.</p><p>Periksa waktu, kalender tujuan, dan alarm sebelum menyimpan. Jika kalender tujuan memakai iCloud/akun lain, event mengikuti sinkronisasi akun itu; pilih kalender lokal bila tersedia.</p></div>
+        </div>
+
+        <div class="settings-group">
+          <div class="section-head no-margin">
+            <div>
+              <h2>Kategori</h2>
+              <p class="muted small">Buat warna dan kategori sesuai kebutuhan.</p>
+            </div>
+            <button id="addCategoryBtn" class="soft-btn">＋ Kategori</button>
+          </div>
+          <div id="categoryList" class="stack compact"></div>
+        </div>
+
+        <div class="settings-group">
+          <h2>Data</h2>
+          <div class="settings-card vertical">
+            <button id="exportBtn" class="list-action">Backup Data <span>›</span></button>
+            <label class="list-action file-label" tabindex="0" role="button">Pulihkan Backup <span>›</span>
+              <input id="importInput" type="file" accept=".json,application/json" hidden />
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h2>Aplikasi &amp; penyimpanan</h2>
+          <p id="appStatus" class="inline-note" role="status"></p>
+          <button id="checkUpdateBtn" class="soft-btn">Periksa Update</button>
+          <button id="persistBtn" class="soft-btn">Minta Penyimpanan Persisten</button>
+          <p class="muted small">Data hanya lokal. Buat backup berkala; menghapus data situs/aplikasi dapat menghapus jadwal. Saat berpindah URL atau perangkat, pulihkan backup JSON.</p>
+        </div>
+        <div class="settings-group">
+          <h2>Instal di iPhone</h2>
+          <button class="soft-btn install-help">Cara Pasang di iPhone</button>
+          <div class="info-card">
+            <ol>
+              <li>Buka alamat PWA ini di <strong>Safari</strong>.</li>
+              <li>Tekan tombol <strong>Bagikan</strong>.</li>
+              <li>Pilih <strong>Tambahkan ke Layar Utama</strong>.</li>
+              <li>Tekan <strong>Add / Tambah</strong>.</li><li>Buka <strong>Fahmi Daily</strong> dari Home Screen.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="settings-group footer-note">
+          <p>Fahmi Daily PWA • data jadwal disimpan lokal di perangkat.</p>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Navigasi utama">
+      <button class="nav-item active" data-page="todayPage"><span>◷</span><small>Hari Ini</small></button>
+      <button class="nav-item" data-page="calendarPage"><span>▦</span><small>Kalender</small></button>
+      <button class="nav-item" data-page="settingsPage"><span>⚙︎</span><small>Pengaturan</small></button>
+    </nav>
+  </div>
+
+  <dialog id="eventDialog" class="sheet-dialog">
+    <form id="eventForm" method="dialog" class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <button type="button" id="closeEventBtn" class="text-btn">Batal</button>
+        <h2 id="eventDialogTitle">Tambah Jadwal</h2>
+        <button type="submit" class="text-btn strong">Simpan</button>
+      </div>
+
+      <div class="form-stack">
+        <label>Judul kegiatan
+          <input id="eventTitle" required maxlength="80" placeholder="Contoh: Lari sore" />
+        </label>
+        <div class="form-grid two">
+          <label>Kategori
+            <select id="eventCategory"></select>
+          </label>
+          <label>Pengingat
+            <select id="eventReminder">
+              <option value="-1">Tanpa pengingat</option>
+              <option value="10">10 menit sebelum</option>
+              <option value="30">30 menit sebelum</option>
+              <option value="1440">1 hari sebelum</option>
+            </select>
+          </label>
+        </div>
+        <label>Tanggal
+          <input id="eventDate" type="date" required />
+        </label>
+        <div class="form-grid two">
+          <label>Mulai
+            <input id="eventStartTime" type="time" required />
+          </label>
+          <label>Selesai
+            <input id="eventEndTime" type="time" required />
+          </label>
+        </div>
+        <label>Ulangi
+          <select id="eventRecurrence">
+            <option value="none">Tidak berulang</option>
+            <option value="daily">Setiap hari</option>
+            <option value="weekly">Setiap minggu</option>
+            <option value="custom">Hari tertentu setiap minggu</option>
+          </select>
+        </label>
+        <div id="weekdayPicker" class="weekday-picker hidden" aria-label="Pilih hari">
+          <button type="button" data-day="1">S</button>
+          <button type="button" data-day="2">S</button>
+          <button type="button" data-day="3">R</button>
+          <button type="button" data-day="4">K</button>
+          <button type="button" data-day="5">J</button>
+          <button type="button" data-day="6">S</button>
+          <button type="button" data-day="0">M</button>
+        </div>
+        <label id="untilField" class="hidden">Berakhir pada (opsional)
+          <input id="eventUntil" type="date" />
+        </label>
+        <label>Lokasi <span class="optional">opsional</span>
+          <input id="eventLocation" maxlength="120" placeholder="Contoh: KU3.04.07" />
+        </label>
+        <label>Catatan <span class="optional">opsional</span>
+          <textarea id="eventNotes" rows="3" maxlength="500" placeholder="Tambahkan catatan"></textarea>
+        </label>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="scopeDialog" class="center-dialog">
+    <div class="modal-card">
+      <h2 id="scopeTitle">Ubah jadwal berulang</h2>
+      <p id="scopeText" class="muted">Pilih bagian yang ingin diubah.</p>
+      <div class="modal-actions vertical-actions">
+        <button id="scopeOneBtn" class="primary-btn">Kejadian ini saja</button>
+        <button id="scopeAllBtn" class="soft-btn">Seluruh rangkaian</button>
+        <button id="scopeCancelBtn" class="text-btn">Batal</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="conflictDialog" class="center-dialog">
+    <div class="modal-card">
+      <div class="warning-icon">!</div>
+      <h2>Jadwal bertabrakan</h2>
+      <p id="conflictText" class="muted"></p>
+      <div class="modal-actions">
+        <button id="conflictBackBtn" class="soft-btn">Kembali</button>
+        <button id="conflictSaveBtn" class="primary-btn">Tetap simpan</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="filterDialog" class="sheet-dialog compact-sheet-dialog">
+    <div class="sheet compact-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head">
+        <button id="filterCloseBtn" class="text-btn">Tutup</button>
+        <h2>Filter kategori</h2>
+        <button id="filterResetBtn" class="text-btn strong">Reset</button>
+      </div>
+      <div id="filterOptions" class="filter-options"></div>
+    </div>
+  </dialog>
+
+  <dialog id="categoryDialog" class="center-dialog">
+    <form id="categoryForm" method="dialog" class="modal-card">
+      <h2>Kategori baru</h2>
+      <label>Nama
+        <input id="categoryName" required maxlength="30" placeholder="Contoh: Bisnis" />
+      </label>
+      <label>Warna
+        <input id="categoryColor" type="color" value="#5B7CFA" />
+      </label>
+      <div class="modal-actions">
+        <button type="button" id="categoryCancelBtn" class="soft-btn">Batal</button>
+        <button type="submit" class="primary-btn">Simpan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="installDialog" class="center-dialog" aria-labelledby="installTitle">
+    <div class="modal-card"><h2 id="installTitle">Cara Pasang di iPhone</h2>
+      <ol><li>Buka URL Fahmi Daily menggunakan Safari.</li><li>Tekan Share / Bagikan.</li><li>Pilih Add to Home Screen / Tambahkan ke Layar Utama. Jika tersembunyi, lihat daftar aksi lainnya.</li><li>Tekan Add / Tambah. Jika ada pilihan Buka sebagai App, aktifkan.</li><li>Buka Fahmi Daily dari Home Screen.</li></ol>
+      <p class="muted small">Tunggu status offline siap sebelum mencoba mode pesawat.</p>
+      <button id="installCloseBtn" class="primary-btn">Mengerti</button>
+    </div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="./app.js" defer></script>
+</body>
+</html>
