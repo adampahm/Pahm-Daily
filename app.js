@@ -674,7 +674,7 @@
   function updateAppStatus(){
     document.documentElement.classList.toggle('standalone',isStandalone());
     $('installHint').classList.toggle('hidden',!isIOS() || isStandalone());
-    $('appStatus').textContent=`v1.2.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
+    $('appStatus').textContent=`v1.3.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
   }
   async function registerSW(){
     if(!('serviceWorker' in navigator) || !window.isSecureContext){updateAppStatus();return;}
@@ -690,7 +690,7 @@
       const names=await caches.keys();
       for(const name of names.filter(name=>name.startsWith(`fahmi-daily:${ready.scope}:`))){
         const cache=await caches.open(name);
-        const core=['index.html','styles.css','app.js','google-config.js','google-calendar.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png'];
+        const core=['index.html','styles.css','app.js','google-config.js','google-calendar.js','google-server.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png'];
         if((await Promise.all(core.map(path=>cache.match(new URL(path,ready.scope).href)))).every(Boolean)){offlineReady=true;break;}
       }
       updateAppStatus();
@@ -731,55 +731,94 @@
   }
 
   function setupGoogleSync(){
-    if(!window.FahmiGoogleCalendar){$('googleSyncStatus').textContent='Modul Google belum dimuat. Periksa update aplikasi.';return;}
-    let tokenClient=null,loaded=false;
+    if(!window.FahmiGoogleCalendar || !window.FahmiGoogleServer){$('googleSyncStatus').textContent='Modul Google belum dimuat. Periksa update aplikasi.';return;}
+    let loaded=false,busy=false,popup=null,backend;
     const render=status=>{
       $('googleSyncStatus').textContent=status.message;
       $('googleSyncStatus').classList.toggle('sync-error',status.error);
       $('googleSyncBanner').classList.toggle('hidden',!status.enabled);
       $('googleSyncBanner').textContent=status.message;
-      $('googleAccount').textContent=status.account?`Akun: ${status.account}`:'Akun Google belum terhubung pada sesi ini.';
+      $('googleAccount').textContent=status.account?`Akun: ${status.account}`:'Google belum terhubung.';
       $('googleTarget').textContent=status.calendarId?`ID kalender tujuan: ${status.calendarId}`:'';
       $('googleLastSync').textContent=status.lastSync?`Sinkron terakhir: ${status.lastSync}`:'';
-      $('googleConnectBtn').disabled=!loaded || !status.enabled || status.running;
-      $('googleSyncBtn').disabled=!status.connected || status.running;
-      $('googleDisconnectBtn').disabled=!status.enabled || status.running;
-      $('googlePrepareBtn').disabled=status.running;
-      $('googleRecoverBtn').disabled=!status.connected || status.running;
+      $('googleConnectBtn').disabled=!loaded || !status.enabled || status.running || busy;
+      $('googleSyncBtn').disabled=!status.enabled || status.running || busy;
+      $('googleDisconnectBtn').disabled=(!status.enabled && !backend?.hasSession) || status.running || busy;
+      $('googlePrepareBtn').disabled=status.running || busy;
+      $('googleRecoverBtn').disabled=!status.connected || status.running || busy;
+      $('googleCompleteBtn').disabled=busy;
     };
+    try {backend=window.FahmiGoogleServer.create();}
+    catch(error){$('googleSyncStatus').textContent=error.message;return;}
     googleSync=window.FahmiGoogleCalendar.create({getState:()=>state,
-      canSync:()=>{try {return !storageBlocked && localStorage.getItem(STORAGE_KEY)===observedRaw;}catch{return false;}},onStatus:render});
-    $('googleClientId').value=googleSync.clientId || window.FAHMI_GOOGLE_CLIENT_ID || '';
+      canSync:()=>{try{return !storageBlocked && localStorage.getItem(STORAGE_KEY)===observedRaw;}catch{return false;}},
+      onStatus:render,credentialProvider:force=>backend.session(force)});
+    $('googleClientId').value=googleSync.clientId || '';
+    const showError=error=>{if(!handleStorageError(error))googleSync.fail(error.message);};
     $('googlePrepareBtn').onclick=async()=>{
-      try {
-        // Persist first-run schedules before any cloud requests.
+      busy=true;googleSync.status();
+      try{
         const recoveryId=$('googleRecoveryId').value.trim();
         if(recoveryId && !confirm('Gunakan kalender lama ini sebagai tujuan? Pulihkan backup lokal terlebih dahulu agar jadwal yang masih diperlukan tidak dihapus.'))return;
-        saveState();googleSync.configure($('googleClientId').value.trim(),recoveryId);
-        await window.FahmiGoogleCalendar.loadGoogle();loaded=true;
-        tokenClient=window.google.accounts.oauth2.initTokenClient({client_id:googleSync.clientId,
-          scope:window.FahmiGoogleCalendar.SCOPES,include_granted_scopes:false,
-          callback:response=>googleSync.acceptToken(response).catch(error=>googleSync.fail(error.message)),
-          error_callback:()=>googleSync.fail('Jendela login tidak selesai/diblokir. Tekan Hubungkan Google lagi; jika perlu coba Safari.')});
-        googleSync.notice('Koneksi siap. Tekan Hubungkan Google dan pilih akun yang dipakai di Kalender iPhone.');
-      } catch(error){if(!handleStorageError(error))googleSync.fail(error.message);}
+        saveState();
+        const server=await backend.prepare();
+        googleSync.configure(server.clientId,recoveryId);$('googleClientId').value=server.clientId;loaded=true;
+        googleSync.notice('Server siap. Tekan Hubungkan Google untuk memberikan izin koneksi otomatis.');
+      }catch(error){showError(error);}finally{busy=false;googleSync.status();}
     };
-    $('googleConnectBtn').onclick=()=>{
-      try {tokenClient?.requestAccessToken({prompt:'select_account'});}catch {googleSync.fail('Login Google belum bisa dibuka. Siapkan koneksi lalu coba lagi.');}
+    $('googleConnectBtn').onclick=async()=>{
+      // Open during the gesture, before the network await; manual link is a fallback.
+      popup=window.open('about:blank','_blank');busy=true;googleSync.status();
+      try{
+        saveState();const login=await backend.begin();
+        $('googleAuthLink').href=login.url;$('googleAuthLink').classList.remove('hidden');
+        if(popup)popup.location.href=login.url;
+        googleSync.notice('Selesaikan izin di Google. Jika tidak kembali otomatis, salin kode koneksi dari halaman hasil ke bagian di bawah.');
+      }catch(error){popup?.close();showError(error);}finally{busy=false;googleSync.status();}
+    };
+    const complete=async(state,code)=>{
+      if(busy)return;
+      busy=true;googleSync.notice('Menyelesaikan koneksi Google…');
+      try{
+        const credentials=await backend.complete(state,code);
+        $('googleConnectionCode').value='';$('googleAuthLink').classList.add('hidden');
+        await googleSync.acceptServerSession(credentials);
+      }catch(error){showError(error);}finally{busy=false;googleSync.status();}
+    };
+    window.addEventListener('message',event=>{
+      if(event.origin!==backend.origin || !popup || event.source!==popup || event.data?.type!=='fahmi-google-code')return;
+      complete(event.data.state,event.data.code);
+    });
+    $('googleCompleteBtn').onclick=()=>{
+      const parts=$('googleConnectionCode').value.trim().split('.');
+      if(parts.length!==2){googleSync.fail('Tempel seluruh kode koneksi dari halaman hasil login Google.');return;}
+      complete(parts[0],parts[1]);
     };
     $('googleSyncBtn').onclick=()=>{
       if(confirm('Sinkronkan data lokal saat ini ke kalender Fahmi Daily? Jadwal Google milik integrasi yang tidak ada lagi di data lokal akan dihapus.'))googleSync.sync(true);
     };
-    $('googleDisconnectBtn').onclick=()=>{try {googleSync.disconnect();loaded=false;tokenClient=null;}catch(error){googleSync.fail(error.message);}};
+    $('googleDisconnectBtn').onclick=async()=>{
+      busy=true;
+      try{
+        googleSync.disconnect();loaded=false;await backend.disconnect();
+        googleSync.notice('Koneksi perangkat dihentikan dan izin yang tersimpan untuk perangkat ini dihapus dari server. Event kalender tetap ada.');
+      }catch(error){googleSync.fail('Sinkron lokal dihentikan. Koneksi server belum dapat dihapus; tekan Hentikan Sinkron lagi saat online. '+error.message);}
+      finally{busy=false;googleSync.status();}
+    };
     $('googleRecoverBtn').onclick=async()=>{
       const id=$('googleRecoveryId').value.trim();if(!id){toast('Isi ID kalender dari Google Calendar terlebih dahulu.');return;}
       if(!confirm('Gunakan kalender ini sebagai tujuan sinkron data lokal? Pulihkan backup lokal terlebih dahulu agar jadwal yang masih diperlukan tidak dihapus.'))return;
-      try {await googleSync.recoverCalendar(id);}catch(error){googleSync.fail(error.message);}
+      try{await googleSync.recoverCalendar(id);}catch(error){showError(error);}
     };
-    window.addEventListener('online',()=>googleSync.changed());
-    window.addEventListener('offline',()=>googleSync.notice('Offline: jadwal tetap tersimpan lokal. Hubungkan kembali saat online untuk menyinkronkan.'));
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden)googleSync.changed();});
+    window.addEventListener('online',()=>{if(googleSync.enabled)googleSync.changed();});
+    window.addEventListener('offline',()=>googleSync.notice('Offline: jadwal tersimpan lokal. Sinkron dicoba kembali saat aplikasi aktif dan online.'));
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden && googleSync.enabled)googleSync.changed();});
+    // Resume only an explicitly enabled integration with an existing device session.
+    try{if(googleSync.enabled && backend.hasSession)googleSync.sync();
+      else googleSync.notice('Tekan Siapkan Koneksi Google untuk mengaktifkan perpanjangan akses otomatis.');
+    }catch(error){showError(error);}
   }
+
 
   setupEvents(); setupPlatform(); setupGoogleSync(); renderAll(); registerSW(); checkReminders(); setInterval(checkReminders,30000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){renderToday();checkReminders();}});

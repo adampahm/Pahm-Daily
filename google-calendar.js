@@ -66,7 +66,7 @@
     return plan;
   }
 
-  function create({getState,canSync,onStatus,storage=localStorage,request=fetch,clock=()=>Date.now()}){
+  function create({getState,canSync,onStatus,storage=localStorage,request=fetch,clock=()=>Date.now(),credentialProvider=null}){
     let config={version:1,enabled:false,clientId:'',accounts:{}},configRaw=null,storageError=false;
     try {
       configRaw=storage.getItem(KEY);
@@ -95,7 +95,27 @@
       if(context && context.epoch!==epoch)throw new Error('Sinkronisasi dihentikan karena koneksi berubah.');
       if(storage.getItem(KEY)!==configRaw)throw new Error('Konfigurasi Google berubah di tab lain. Buka ulang aplikasi sebelum menyinkronkan.');
     }
+    function assignServerCredentials(value){
+      if(!value?.profile?.sub || !value.profile.email || !value.access_token || !Number.isFinite(Number(value.expires_in)) || Number(value.expires_in)<=60 || value.clientId!==config.clientId)throw new Error('Identitas atau konfigurasi server tidak sesuai. Siapkan koneksi kembali.');
+      if(account && account.sub!==value.profile.sub)throw new Error('Akun server berubah. Hentikan sinkron lalu hubungkan akun yang benar.');
+      account=value.profile;accessToken=value.access_token;expiresAt=clock()+(Number(value.expires_in)-60)*1000;
+    }
+    async function ensureCredentials(context,force=false){
+      if(!credentialProvider || (!force && accessToken && clock()<expiresAt))return;
+      if(!config.enabled || !canSync())throw new Error('Sinkron tidak aktif atau data lokal belum aman.');
+      const started=epoch,value=await credentialProvider(force);
+      if(epoch!==started || (context && context.epoch!==epoch))throw new Error('Koneksi berubah; sinkron dihentikan.');
+      assignServerCredentials(value);
+    }
+    async function acceptServerSession(value){
+      if(!credentialProvider || !config.enabled)throw new Error('Siapkan koneksi server terlebih dahulu.');
+      assignServerCredentials(value);epoch++;
+      if(config.recoveryId){await recoverCalendar(config.recoveryId);delete config.recoveryId;persist();}
+      else await performSync();
+    }
     async function api(path,{method='GET',body,context}={}){
+      await ensureCredentials(context);
+
       check(context);
       const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),20000);
       let response;
@@ -103,6 +123,10 @@
       catch {throw new Error('Koneksi Google gagal. Jadwal tetap lokal; coba Sinkron Sekarang saat online.');}
       finally {clearTimeout(timeout);}
       check(context);
+      if(response.status===401 && credentialProvider && !context?.retried){
+        accessToken='';expiresAt=0;await ensureCredentials(context,true);
+        return api(path,{method,body,context:{...(context||{epoch}),retried:true}});
+      }
       if(response.status===401){accessToken='';expiresAt=0;const error=new Error('Izin sesi Google kedaluwarsa. Tekan Hubungkan Google lagi.');error.status=401;throw error;}
       if(!response.ok){const error=new Error(response.status===403?'Google menolak akses. Periksa API, scope, kuota, akun dan konfigurasi OAuth.':`Google Calendar belum dapat disinkronkan (HTTP ${response.status}). Coba lagi; jadwal lokal tetap aman.`);error.status=response.status;throw error;}
       return response.status===204?null:response.json();
@@ -145,8 +169,10 @@
       if(!config.enabled){emit('Google Calendar belum diaktifkan.');return;}
       if(!canSync()){emit('Data lokal perlu dipulihkan sebelum sinkronisasi.',true);return;}
       if(!navigator.onLine){emit('Offline: perubahan tersimpan lokal. Sinkron akan dicoba saat online dan sesi Google masih aktif.');return;}
+      try {await ensureCredentials({epoch});}catch(error){emit(error.message,true);return;}
       if(!authorized()){emit('Perubahan tersimpan lokal. Hubungkan Google untuk menyinkronkan.');return;}
       if(config.restorePaused && !force){emit('Backup dipulihkan. Periksa jadwal lalu tekan Sinkron Sekarang sebelum perubahan dikirim ke Google.');return;}
+      if(running){again=true;return;}
       running=true;again=false;emit('Menyinkronkan ke Google Calendar…');
       const context={epoch};
       try {
@@ -260,7 +286,7 @@
     function fail(message){emit(message,true);}
     function notice(message){emit(message);}
     emit(storageError?'Konfigurasi Google rusak/tidak tersedia. Sinkron diblokir; jadwal lokal tidak diubah.':'Google belum terhubung pada sesi ini.',storageError);
-    return {configure,acceptToken,disconnect,recoverCalendar,pauseAfterRestore,sync:performSync,changed:queue,status:emitStatus,fail,
+    return {configure,acceptToken,acceptServerSession,disconnect,recoverCalendar,pauseAfterRestore,sync:performSync,changed:queue,status:emitStatus,fail,
       notice,get clientId(){return config.clientId;},get enabled(){return config.enabled;}};
   }
 

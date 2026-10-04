@@ -40,7 +40,7 @@ function fixture(options={}){
  const ctx={window:{google:{accounts:{oauth2:{hasGrantedAllScopes:()=>true}}}},document:{head:{appendChild(){throw Error('SDK unexpectedly loaded')}},createElement:()=>({})},navigator:{onLine:true},crypto,TextEncoder,Date,Intl,URLSearchParams,AbortController,localStorage:storage,fetch:request,
   setTimeout(fn,ms){const id=++timerId;timers.set(id,{fn,ms});return id},clearTimeout:id=>timers.delete(id)};
  vm.createContext(ctx);vm.runInContext(source,ctx);
- const controller=ctx.window.FahmiGoogleCalendar.create({getState:()=>state,canSync:()=>readable,onStatus:s=>statuses.push(s),storage,request,clock:()=>now});
+ const controller=ctx.window.FahmiGoogleCalendar.create({getState:()=>state,canSync:()=>readable,onStatus:s=>statuses.push(s),storage,request,clock:()=>now,credentialProvider:options.provider});
  return {ctx,controller,values,calls,statuses,calendars,events,timers,set state(v){state=v},get state(){return state},set now(v){now=v},get now(){return now},set profile(v){profile=v},set hook(v){hook=v},set readable(v){readable=v},set failWrite(v){failWrite=v},
   async connect(){controller.configure(clientId);await controller.acceptToken({access_token:'TEST_ONLY_TOKEN',expires_in:3600});},
   async flush(){for(const [id,t] of [...timers])if(t.ms===600){timers.delete(id);await t.fn();}},
@@ -68,5 +68,24 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name)}
  await test('Restore pauses automatic cleanup until explicit forced sync',async()=>{const f=fixture();await f.connect();f.state.events=[];f.controller.pauseAfterRestore();f.calls.length=0;f.controller.changed();await f.flush();assert.equal(f.calls.length,0);assert.equal(f.active().length,1);await f.controller.sync(true);assert.equal(f.active().length,0)});
  await test('Known calendar link recovery reuses calendar rather than creating duplicates',async()=>{const f=fixture();await f.connect();const old=JSON.parse(f.values.get(key)),calendarId=old.accounts['account-a'].calendarId;f.controller.disconnect();const raw=JSON.parse(f.values.get(key));raw.accounts={};f.values.set(key,JSON.stringify(raw));const g=fixture({raw:JSON.stringify(raw)});for(const [id,c] of f.calendars)g.calendars.set(id,c);for(const [id,e] of f.events)g.events.set(id,e);g.controller.configure(clientId,calendarId);await g.controller.acceptToken({access_token:'RECOVERY_TOKEN',expires_in:3600});assert.equal(g.calendars.size,1);assert.equal(g.active().length,1)});
  await test('Unknown calendar-create outcome does not recreate on retry',async()=>{const f=fixture();f.hook=({method,url})=>{if(method==='POST' && url.endsWith('/calendars'))throw Error('unknown outcome')};await f.connect();f.hook=null;f.calls.length=0;await f.controller.sync();assert(!f.calls.some(c=>c.method==='POST'));assert(f.statuses.at(-1).message.includes('Pulihkan Tautan'))});
+ const credentials=()=>({access_token:'SERVER_ACCESS',expires_in:3600,clientId,profile:{sub:'account-a',email:'a@example.test'}});
+ await test('Server provider resumes and renews without SDK or duplicate calendar',async()=>{
+  let count=0;const provider=async()=>{count++;return credentials()},f=fixture({provider});f.controller.configure(clientId);await f.controller.sync();assert.equal(count,1);assert.equal(f.active().length,1);
+  f.now+=3600000;f.state.events[0].title='After expiry';await f.controller.sync();assert.equal(count,2);assert.equal(f.active()[0].summary,'After expiry');assert.equal(f.calendars.size,1);
+  const g=fixture({provider,raw:f.values.get(key)});g.state=f.state;for(const [id,c] of f.calendars)g.calendars.set(id,c);for(const [id,e] of f.events)g.events.set(id,e);await g.controller.sync();assert.equal(g.calendars.size,1);assert.equal(g.active().length,1);
+ });
+ await test('Google 401 forces one server refresh then retries safely',async()=>{
+  const refreshes=[];const f=fixture({provider:async force=>{refreshes.push(force);return credentials()}});f.controller.configure(clientId);await f.controller.sync();let reject=true;
+  f.hook=()=>{if(reject){reject=false;return new Response('{}',{status:401})}};await f.controller.sync();assert.deepEqual(refreshes,[false,true]);assert.equal(f.active().length,1);assert(!f.statuses.at(-1).error);
+ });
+ await test('Concurrent provider resume is serialized before calendar writes',async()=>{
+  const f=fixture({provider:async()=>credentials()});f.controller.configure(clientId);await Promise.all([f.controller.sync(),f.controller.sync()]);assert.equal(f.calendars.size,1);assert.equal(f.active().length,1);
+ });
+ await test('Disconnect while server refresh is pending prevents calendar writes',async()=>{
+  let resolve;const f=fixture({provider:()=>new Promise(r=>{resolve=r})});f.controller.configure(clientId);const sync=f.controller.sync();f.controller.disconnect();resolve(credentials());await sync;assert.equal(f.calls.length,0);assert.equal(f.active().length,0);
+ });
+ await test('Mismatched server client ID fails before calendar access',async()=>{
+  const f=fixture({provider:async()=>({...credentials(),clientId:'different'})});f.controller.configure(clientId);await f.controller.sync();assert.equal(f.calls.length,0);assert(f.statuses.at(-1).error);
+ });
  console.log(`${passed} Google Calendar tests passed.`);
 })().catch(error=>{console.error(error);process.exitCode=1});

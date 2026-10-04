@@ -75,18 +75,24 @@
       <section id="settingsPage" class="page" aria-label="Pengaturan">
         <div class="settings-group google-sync-group">
           <h2>Google Calendar otomatis</h2>
-          <p class="muted small">Setelah terhubung, jadwal lokal dikirim ke kalender khusus Fahmi Daily. Tambah, edit, hapus dan pengulangan mengikuti aplikasi ini. Koneksi internet dan sesi Google aktif diperlukan.</p>
-          <div class="info-card"><p>Saat diaktifkan, judul, tanggal/jam, lokasi, catatan, kategori dan pengingat dikirim ke Google. Izin terbatas pada kalender yang dibuat aplikasi. Pilih akun Google yang sama di Kalender iPhone.</p><p>Setelah reload atau sesi kedaluwarsa, hubungkan kembali. Perubahan dari Kalender iPhone/Google tidak diimpor ke Fahmi Daily. Buat perubahan melalui aplikasi ini dan tetap lakukan backup JSON.</p></div>
-          <label class="sync-label">OAuth Client ID Google
-            <input id="googleClientId" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="123456-…apps.googleusercontent.com" />
+          <p class="muted small">Setelah terhubung, jadwal lokal dikirim ke kalender khusus Fahmi Daily. Tambah, edit, hapus dan pengulangan mengikuti aplikasi ini. Server memperpanjang akses Google otomatis saat diperlukan. Koneksi internet diperlukan untuk sinkron.</p>
+          <div class="info-card"><p>Saat diaktifkan, judul, tanggal/jam, lokasi, catatan, kategori dan pengingat dikirim ke Google. Izin terbatas pada kalender yang dibuat aplikasi. Pilih akun Google yang sama di Kalender iPhone.</p><p>Cloudflare menyimpan izin Google secara terenkripsi. Koneksi perangkat bertahan setelah reload, maksimal 90 hari; izin yang dicabut tetap memerlukan login ulang. Jadwal tetap dikirim langsung ke Google. Perubahan dari Kalender iPhone/Google tidak diimpor ke Fahmi Daily. Buat perubahan melalui aplikasi ini dan tetap lakukan backup JSON.</p></div>
+          <label class="sync-label">Client ID dari server
+            <input id="googleClientId" readonly autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="123456-…apps.googleusercontent.com" />
           </label>
-          <p class="muted small">Isi Client ID aplikasi Web dari Google Cloud, bukan Client Secret. <a href="./GOOGLE-CALENDAR.md" target="_blank" rel="noopener">Panduan aktivasi</a></p>
+          <p class="muted small">Client ID diisi otomatis dari server setelah Siapkan Koneksi. <a href="./GOOGLE-CALENDAR.md" target="_blank" rel="noopener">Panduan aktivasi</a></p>
           <div class="sync-actions">
             <button id="googlePrepareBtn" class="soft-btn">Siapkan Koneksi Google</button>
             <button id="googleConnectBtn" class="primary-btn" disabled>Hubungkan Google</button>
             <button id="googleSyncBtn" class="soft-btn" disabled>Sinkron Sekarang</button>
             <button id="googleDisconnectBtn" class="soft-btn" disabled>Hentikan Sinkron</button>
           </div>
+          <a id="googleAuthLink" class="hidden" target="_blank" rel="noopener noreferrer">Buka halaman login Google</a>
+          <details><summary>Masukkan kode jika login tidak kembali otomatis</summary>
+            <p class="muted small">Salin kode dari halaman hasil login Google, lalu tempel di aplikasi asal ini. Kode berlaku 5 menit. Jangan memulai koneksi kedua sebelum memasukkan kode pertama.</p>
+            <label class="sync-label">Kode koneksi<textarea id="googleConnectionCode" rows="3" autocomplete="off" autocapitalize="none" spellcheck="false"></textarea></label>
+            <button id="googleCompleteBtn" class="soft-btn">Selesaikan Koneksi</button>
+          </details>
           <p id="googleSyncStatus" class="inline-note" role="status" aria-live="polite"></p>
           <p id="googleAccount" class="inline-note"></p>
           <p id="googleLastSync" class="inline-note"></p>
@@ -293,6 +299,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="./google-config.js" defer></script>
   <script src="./google-calendar.js" defer></script>
+  <script src="./google-server.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>

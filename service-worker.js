@@ -1,9 +1,9 @@
 'use strict';
 // Increment VERSION for each release that changes the app shell.
-const VERSION = 'v1.2.0-release';
+const VERSION = 'v1.3.0-release';
 const PREFIX = `fahmi-daily:${self.registration.scope}:`;
 const CACHE = PREFIX + VERSION;
-const ASSETS = ['index.html','styles.css','app.js','google-config.js','google-calendar.js','manifest.webmanifest',
+const ASSETS = ['index.html','styles.css','app.js','google-config.js','google-calendar.js','google-server.js','manifest.webmanifest',
   'icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png'];
 const absolute = path => new URL(path,self.registration.scope).href;
 self.addEventListener('install',event=>{

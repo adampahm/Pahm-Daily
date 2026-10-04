@@ -1,3 +1,7 @@
+# Tambahan v1.3.0
+
+Backend baru menggunakan Web Crypto AES-GCM, OAuth state/PKCE, pembatasan satu email, origin eksplisit, kredensial sesi acak 256-bit disimpan sebagai hash, kode koneksi sekali pakai, dan expiry 90 hari. Jadwal tetap berada di perangkat dan Google. Frontend tidak menerima refresh token atau Client Secret. Pengujian backend menggunakan SQLite nyata dan Google simulasi. Lihat TESTING.md pada akar paket untuk batas validasi.
+
 # Audit Fahmi Daily v1.0 → v1.1.0
 
 Semua source dibaca sebelum modifikasi: index.html, styles.css, app.js, manifest.webmanifest, service-worker.js, README.md; dimensi PNG diperiksa dan ikon utama dilihat. Aplikasi dipertahankan, bukan dibuat ulang. Ikon 180/192/512 benar dan identik secara byte dengan versi asli, sehingga tidak perlu generator ikon.

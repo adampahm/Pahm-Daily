@@ -1,6 +1,6 @@
-# Fahmi Daily PWA — v1.2.0 untuk iPhone dan Google Calendar
+# Fahmi Daily PWA — v1.3.0 dengan backend Cloudflare
 
-Modifikasi langsung dari FahmiDaily-PWA-v1.0.zip; bukan aplikasi baru. Tetap static HTML/CSS/JS tanpa build, backend, atau analytics. Data utama jadwal tetap lokal. Integrasi Google Calendar bersifat opsional: setelah Anda mengaktifkan dan memberikan izin Google, salinan jadwal dikirim ke kalender khusus Fahmi Daily. Google Identity Services hanya dimuat saat Anda menekan Siapkan Koneksi. Source asli tidak diubah di Downloads.
+Modifikasi langsung dari FahmiDaily-PWA-v1.0.zip; bukan aplikasi baru. Frontend tetap static HTML/CSS/JS tanpa build atau analytics, dengan backend OAuth Cloudflare opsional. Data utama jadwal tetap lokal. Integrasi Google Calendar bersifat opsional: setelah Anda mengaktifkan dan memberikan izin Google, salinan jadwal dikirim ke kalender khusus Fahmi Daily. Server memperbarui akses Google otomatis; refresh token disimpan terenkripsi di D1. Source asli tidak diubah di Downloads.
 
 ## Sebelum memperbarui aplikasi lama
 
@@ -90,7 +90,7 @@ iCalendar RFC 5545: https://www.rfc-editor.org/rfc/rfc5545
 
 ## Opsi Web Push untuk masa depan (tidak diimplementasikan)
 
-Web Push didukung untuk Home Screen web apps pada iOS/iPadOS 16.4+ dengan izin lewat aksi pengguna. Untuk mengirim reminder ketika app tertutup, diperlukan push subscription, endpoint pengirim/backend, kunci VAPID yang private tetap di server, dan scheduler yang mengetahui waktu reminder. GitHub Pages static saja tidak menyediakan bagian itu. Sinkronisasi jadwal/subscription ke layanan tersebut memerlukan persetujuan eksplisit Anda; tidak ada pengiriman atau backend dalam versi ini. Push juga bergantung pada koneksi serta pengaturan perangkat dan bukan alarm native dengan jaminan tepat waktu.
+Web Push didukung untuk Home Screen web apps pada iOS/iPadOS 16.4+ dengan izin lewat aksi pengguna. Untuk mengirim reminder ketika app tertutup, diperlukan push subscription, endpoint pengirim/backend, kunci VAPID yang private tetap di server, dan scheduler yang mengetahui waktu reminder. GitHub Pages static saja tidak menyediakan bagian itu. Sinkronisasi jadwal/subscription ke layanan tersebut memerlukan persetujuan eksplisit Anda; backend versi ini hanya menangani koneksi Google, belum menyediakan Web Push. Push juga bergantung pada koneksi serta pengaturan perangkat dan bukan alarm native dengan jaminan tepat waktu.
 
 Referensi: https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/
 
@@ -121,6 +121,8 @@ Core memakai cache-first per versi; navigasi memakai index.html dari cache versi
 
 Lihat **AUDIT.md** untuk temuan/perubahan file dan **TESTING.md** untuk bukti pengujian serta hal yang belum diverifikasi di iPhone fisik.
 
-## Google Calendar opsional (v1.2.0)
+## Google Calendar opsional (v1.3.0)
 
-Ikuti [panduan aktivasi untuk URL Anda](GOOGLE-CALENDAR.md). Client ID masih harus dibuat oleh pemilik akun Google Cloud. Tidak ada Client Secret di aplikasi. Sinkron berjalan saat aplikasi aktif dan sesi Google masih berlaku; setelah reload atau sesi kedaluwarsa, hubungkan kembali. Backup JSON tetap menjadi cadangan data utama, dan tidak menyimpan token maupun metadata koneksi Google.
+Ikuti [panduan aktivasi Cloudflare](GOOGLE-CALENDAR.md). Server harus dipasang dan menunjukkan ready:true sebelum frontend diperbarui. Gunakan Client ID lama; Secret hanya di Cloudflare. Sesi perangkat bertahan setelah reload hingga 90 hari, selama izin Google masih berlaku. Mode Google External/Testing memiliki batas refresh token sekitar 7 hari untuk izin kalender. Sinkron terjadi saat PWA aktif dan online; backend ini tidak menjalankan penjadwal latar belakang untuk data lokal.
+
+Backup JSON tetap menjadi cadangan jadwal utama dan tidak menyimpan kredensial atau metadata Google. Di perangkat yang sama, localStorage `fahmiDailyPWA.v1` dan metadata kalender versi lama dipertahankan. Jika pindah perangkat, pulihkan backup lalu gunakan ID kalender pemulihan sebelum sinkron. Kode frontend tidak berisi Client Secret atau kunci enkripsi.

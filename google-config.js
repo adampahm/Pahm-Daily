@@ -1,4 +1,3 @@
 'use strict';
-// Public OAuth Client ID, NOT a Client Secret. May also be entered in Settings.
-// Authorized JavaScript origin for your deployment: https://adampahm.github.io
-window.FAHMI_GOOGLE_CLIENT_ID = '';
+// Public URL only. Client Secret and encryption key belong in Cloudflare Secrets.
+window.FAHMI_BACKEND_URL = 'https://fahmi-daily-api.fajarxxx055.workers.dev';
