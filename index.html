@@ -26,6 +26,7 @@
 
     <main class="content" id="mainContent">
       <aside id="installHint" class="info-card hidden"><strong>Pasang Fahmi Daily ke iPhone:</strong><p>Tekan tombol Share → Add to Home Screen.</p><button class="soft-btn install-help">Cara Pasang di iPhone</button></aside>
+      <aside id="googleSyncBanner" class="info-card hidden" role="status" aria-live="polite"></aside>
       <aside id="storageWarning" class="info-card hidden" role="alert"></aside>
       <aside id="updateNotice" class="info-card hidden"><p>Versi baru siap. Simpan form dan buat backup sebelum memperbarui.</p><button id="updateBtn" class="soft-btn">Perbarui Aplikasi</button></aside>
       <section id="todayPage" class="page active" aria-label="Hari Ini">
@@ -72,6 +73,30 @@
       </section>
 
       <section id="settingsPage" class="page" aria-label="Pengaturan">
+        <div class="settings-group google-sync-group">
+          <h2>Google Calendar otomatis</h2>
+          <p class="muted small">Setelah terhubung, jadwal lokal dikirim ke kalender khusus Fahmi Daily. Tambah, edit, hapus dan pengulangan mengikuti aplikasi ini. Koneksi internet dan sesi Google aktif diperlukan.</p>
+          <div class="info-card"><p>Saat diaktifkan, judul, tanggal/jam, lokasi, catatan, kategori dan pengingat dikirim ke Google. Izin terbatas pada kalender yang dibuat aplikasi. Pilih akun Google yang sama di Kalender iPhone.</p><p>Setelah reload atau sesi kedaluwarsa, hubungkan kembali. Perubahan dari Kalender iPhone/Google tidak diimpor ke Fahmi Daily. Buat perubahan melalui aplikasi ini dan tetap lakukan backup JSON.</p></div>
+          <label class="sync-label">OAuth Client ID Google
+            <input id="googleClientId" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="123456-…apps.googleusercontent.com" />
+          </label>
+          <p class="muted small">Isi Client ID aplikasi Web dari Google Cloud, bukan Client Secret. <a href="./GOOGLE-CALENDAR.md" target="_blank" rel="noopener">Panduan aktivasi</a></p>
+          <div class="sync-actions">
+            <button id="googlePrepareBtn" class="soft-btn">Siapkan Koneksi Google</button>
+            <button id="googleConnectBtn" class="primary-btn" disabled>Hubungkan Google</button>
+            <button id="googleSyncBtn" class="soft-btn" disabled>Sinkron Sekarang</button>
+            <button id="googleDisconnectBtn" class="soft-btn" disabled>Hentikan Sinkron</button>
+          </div>
+          <p id="googleSyncStatus" class="inline-note" role="status" aria-live="polite"></p>
+          <p id="googleAccount" class="inline-note"></p>
+          <p id="googleLastSync" class="inline-note"></p>
+          <p id="googleTarget" class="inline-note"></p>
+          <details><summary>Pulihkan tautan kalender yang sudah dibuat</summary>
+            <p class="muted small">Gunakan bila pembuatan kalender sempat gagal dikonfirmasi atau pindah browser/perangkat. Ambil ID dari Google Calendar → Settings → kalender Fahmi Daily → Integrate calendar. Pulihkan backup jadwal lokal lebih dahulu.</p>
+            <label class="sync-label">ID Kalender<input id="googleRecoveryId" autocapitalize="none" spellcheck="false" placeholder="…@group.calendar.google.com" /></label>
+            <button id="googleRecoverBtn" class="soft-btn" disabled>Pulihkan Tautan Kalender</button>
+          </details>
+        </div>
         <div class="settings-group">
           <h2>Pengingat</h2>
           <div class="settings-card">
@@ -111,7 +136,7 @@
           <p id="appStatus" class="inline-note" role="status"></p>
           <button id="checkUpdateBtn" class="soft-btn">Periksa Update</button>
           <button id="persistBtn" class="soft-btn">Minta Penyimpanan Persisten</button>
-          <p class="muted small">Data hanya lokal. Buat backup berkala; menghapus data situs/aplikasi dapat menghapus jadwal. Saat berpindah URL atau perangkat, pulihkan backup JSON.</p>
+          <p class="muted small">Data jadwal disimpan lokal; saat integrasi Google diaktifkan, salinannya dikirim ke Google Calendar. Buat backup berkala; menghapus data situs/aplikasi dapat menghapus jadwal. Saat berpindah URL atau perangkat, pulihkan backup JSON.</p>
         </div>
         <div class="settings-group">
           <h2>Instal di iPhone</h2>
@@ -127,7 +152,7 @@
         </div>
 
         <div class="settings-group footer-note">
-          <p>Fahmi Daily PWA • data jadwal disimpan lokal di perangkat.</p>
+          <p>Fahmi Daily PWA • data lokal dengan sinkron Google Calendar opsional.</p>
         </div>
       </section>
     </main>
@@ -266,6 +291,8 @@
     </div>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="./google-config.js" defer></script>
+  <script src="./google-calendar.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>

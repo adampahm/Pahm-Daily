@@ -46,3 +46,12 @@ Harness memakai Node VM dengan DOM/localStorage/Cache/Notification mock. Ini mem
 4. Nyalakan server, ubah satu label dan VERSION worker, buka Periksa Update.
 5. Tutup form, Perbarui, cek label baru serta kegiatan lama. Jangan gunakan ulang nama cache release.
 6. Pada perangkat iPhone lakukan mode pesawat dan restart setelah pemasangan, lalu periksa backup/restore dan alarm Calendar.
+
+## Tambahan v1.2.0 — Google Calendar
+
+Integrasi opsional dengan scope calendar.app.created, kalender khusus, token hanya di memori, pemulihan ID kalender, sinkron satu arah, pengulangan dan pengecualian, reminder, serta jeda setelah restore. Konfigurasi lokal terpisah dari backup jadwal.
+
+18 pengujian Google Calendar dengan mock lolos: idempotensi, kegagalan jaringan, offline, kedaluwarsa, isolasi akun/event, kuota dan tab usang, restore, serta pemulihan kalender. 14 pengujian aplikasi lama dan pengujian service worker tetap lolos. OAuth dan Calendar akun nyata belum diuji karena Client ID belum tersedia.
+
+Browser v1.2.0: halaman Pengaturan dimuat nyata, validasi Client ID invalid menolak sebelum memuat SDK Google, console tidak menampilkan error, reload berhasil, dan tampilan 390x844 tidak melebar horizontal (documentWidth 375). Screenshot pratinjau disimpan terpisah. Tombol aktivasi update pada browser uji mengalami timeout dialog; aktivasi update v1.2.0 tidak diklaim lolos dari pemeriksaan ini.
+

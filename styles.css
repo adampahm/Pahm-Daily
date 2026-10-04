@@ -215,3 +215,14 @@ html:has(dialog[open]), body:has(dialog[open]) { overflow-y: hidden; }
 .file-label:focus-within, button:focus-visible { outline: 3px solid #456c92; outline-offset: 2px; }
 @media (max-width: 380px) { .settings-card { flex-wrap: wrap; } .weekday-picker { grid-template-columns: repeat(4, minmax(44px,1fr)); } }
 @media (prefers-reduced-motion: reduce) { .page { animation: none; } .toast { transition: none; } }
+
+/* Optional Google Calendar integration */
+.sync-label { display: grid; gap: 6px; margin-top: 12px; font-size: 14px; font-weight: 650; }
+.sync-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.sync-actions button { padding: 10px 12px; }
+.sync-error { color: var(--danger); }
+.google-sync-group .inline-note { overflow-wrap: anywhere; }
+.google-sync-group details { margin-top: 14px; }
+.google-sync-group summary { min-height: 44px; padding-block: 12px; cursor: pointer; }
+button:disabled { opacity: .55; cursor: default; }
+@media (max-width: 380px) { .sync-actions { grid-template-columns: 1fr; } }

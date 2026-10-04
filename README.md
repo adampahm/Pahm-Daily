@@ -1,6 +1,6 @@
-# Fahmi Daily PWA — v1.1.0 untuk iPhone
+# Fahmi Daily PWA — v1.2.0 untuk iPhone dan Google Calendar
 
-Modifikasi langsung dari FahmiDaily-PWA-v1.0.zip; bukan aplikasi baru. Tetap static HTML/CSS/JS, tanpa build, backend, login, analytics, script pihak ketiga, atau database cloud. Data jadwal tetap lokal. Source asli tidak diubah di Downloads.
+Modifikasi langsung dari FahmiDaily-PWA-v1.0.zip; bukan aplikasi baru. Tetap static HTML/CSS/JS tanpa build, backend, atau analytics. Data utama jadwal tetap lokal. Integrasi Google Calendar bersifat opsional: setelah Anda mengaktifkan dan memberikan izin Google, salinan jadwal dikirim ke kalender khusus Fahmi Daily. Google Identity Services hanya dimuat saat Anda menekan Siapkan Koneksi. Source asli tidak diubah di Downloads.
 
 ## Sebelum memperbarui aplikasi lama
 
@@ -120,3 +120,7 @@ Core memakai cache-first per versi; navigasi memakai index.html dari cache versi
 - [ ] Deploy update, pastikan prompt tampil dan data tetap ada setelah update.
 
 Lihat **AUDIT.md** untuk temuan/perubahan file dan **TESTING.md** untuk bukti pengujian serta hal yang belum diverifikasi di iPhone fisik.
+
+## Google Calendar opsional (v1.2.0)
+
+Ikuti [panduan aktivasi untuk URL Anda](GOOGLE-CALENDAR.md). Client ID masih harus dibuat oleh pemilik akun Google Cloud. Tidak ada Client Secret di aplikasi. Sinkron berjalan saat aplikasi aktif dan sesi Google masih berlaku; setelah reload atau sesi kedaluwarsa, hubungkan kembali. Backup JSON tetap menjadi cadangan data utama, dan tidak menyimpan token maupun metadata koneksi Google.

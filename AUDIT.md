@@ -17,3 +17,9 @@ Semua source dibaca sebelum modifikasi: index.html, styles.css, app.js, manifest
 File tambahan: `.nojekyll`, `AUDIT.md`, `TESTING.md`, `tests/app.test.cjs`, `tests/service-worker.test.cjs`. Semua perubahan berada dalam project final di outputs. Jadwal kuliah awal dan seluruh fitur lama dipertahankan. Statistik belum ada pada source asli, sehingga ditambahkan sebagai ringkasan minggu ini.
 
 Tidak menambahkan script pihak ketiga, cloud storage, analytics, secret, atau login. Jadwal runtime tidak diupload. GitHub Pages mempublikasikan source termasuk data kuliah awal yang sudah ada dalam source; tinjau sebelum upload. Backup/perangkat baru tetap perlu transfer JSON manual. LocalStorage tidak menjanjikan perlindungan terhadap penghapusan data browser/eviction perangkat.
+
+## Tambahan v1.2.0 — Google Calendar
+
+Integrasi opsional dengan scope calendar.app.created, kalender khusus, token hanya di memori, pemulihan ID kalender, sinkron satu arah, pengulangan dan pengecualian, reminder, serta jeda setelah restore. Konfigurasi lokal terpisah dari backup jadwal.
+
+18 pengujian Google Calendar dengan mock lolos: idempotensi, kegagalan jaringan, offline, kedaluwarsa, isolasi akun/event, kuota dan tab usang, restore, serta pemulihan kalender. 14 pengujian aplikasi lama dan pengujian service worker tetap lolos. OAuth dan Calendar akun nyata belum diuji karena Client ID belum tersedia.
