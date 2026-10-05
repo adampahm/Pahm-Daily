@@ -98,10 +98,11 @@
       review={data,r,done,id};$('weatherRiskText').innerHTML=`<p class="weather-event-name">${safe(data.title)}</p><p class="muted">${safe(data.date)} · ${safe(data.startTime)}–${safe(data.endTime)}</p><p>Pertimbangkan mengganti waktu kegiatan.</p>`;
       let alternatives=[];
       if(r.data && !r.stale){
-        const duration=window.FahmiWeather.bounds(data)[1]-window.FahmiWeather.bounds(data)[0];
+        const duration=Math.max(300000,Math.ceil((window.FahmiWeather.bounds(data)[1]-window.FahmiWeather.bounds(data)[0])/300000)*300000);
         const originalStart=window.FahmiWeather.bounds(data)[0];
         for(const unix of [...r.data.hourly.time].sort((a,b)=>Math.abs(a*1000-originalStart)-Math.abs(b*1000-originalStart))){
-          const start=new Date(unix*1000),end=new Date(unix*1000+duration),pad=n=>String(n).padStart(2,'0');
+          const rounded=Math.ceil(unix*1000/300000)*300000;
+          const start=new Date(rounded),end=new Date(rounded+duration),pad=n=>String(n).padStart(2,'0');
           const day=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
           const time=d=>`${pad(d.getHours())}:${pad(d.getMinutes())}`;
           if(start.getTime()<=Date.now() || day(start)!==data.date || day(end)!==data.date || start.getHours()<6 || end.getHours()>21 || (end.getHours()===21 && end.getMinutes()>0))continue;

@@ -10,7 +10,7 @@
   <meta name="format-detection" content="telephone=no" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
-  <link rel="icon" href="./icons/icon-192.png" />
+  <link rel="icon" href="./icons/favicon.png" />
   <link rel="stylesheet" href="./styles.css" />
   <title>Fahmi Daily</title>
 </head>
@@ -25,8 +25,7 @@
     </header>
 
     <main class="content" id="mainContent">
-      <aside id="installHint" class="info-card hidden"><strong>Pasang Fahmi Daily ke iPhone:</strong><p>Tekan tombol Share → Add to Home Screen.</p><button class="soft-btn install-help">Cara Pasang di iPhone</button></aside>
-      <aside id="googleSyncBanner" class="calendar-banner" role="status" aria-live="polite"><strong id="googleBannerLabel">Google Calendar · Belum terhubung</strong><button id="calendarSettingsBtn" class="text-btn">Kelola</button></aside>
+      <aside id="googleSyncBanner" class="calendar-banner hidden" role="status" aria-live="polite"><strong id="googleBannerLabel">Sinkron gagal</strong><button id="calendarSettingsBtn" class="text-btn">Periksa</button></aside>
       <aside id="storageWarning" class="info-card hidden" role="alert"></aside>
       <aside id="weatherOverviewBanner" class="info-card weather-rain hidden" role="status" aria-live="polite"></aside>
       <aside id="updateNotice" class="info-card hidden"><p>Pembaruan aplikasi siap.</p><button id="updateBtn" class="soft-btn">Perbarui Aplikasi</button><details><summary>Lihat Detail</summary><p>Simpan formulir dan buat backup sebelum memperbarui.</p></details></aside>
@@ -74,13 +73,55 @@
       </section>
 
       <section id="settingsPage" class="page" aria-label="Pengaturan">
-        <div class="settings-group google-sync-group">
-          <p class="eyebrow">KONEKSI KALENDER</p>
+<div id="settingsMenu" class="settings-menu"><button class="list-action" data-settings-open="app">Aplikasi &amp; Penyimpanan<span aria-hidden="true">›</span></button><button class="list-action" data-settings-open="data">Data<span aria-hidden="true">›</span></button><button class="list-action" data-settings-open="categories">Kategori<span aria-hidden="true">›</span></button><button class="list-action" data-settings-open="reminders">Pengingat<span aria-hidden="true">›</span></button><button class="list-action" data-settings-open="calendar">Koneksi Kalender<span aria-hidden="true">›</span></button></div><div id="settingsBackRow" class="hidden"><button id="settingsBackBtn" class="text-btn">‹ Kembali</button></div><div data-settings-panel="app" class="hidden">        <div class="settings-group">
+          <h2>Aplikasi &amp; penyimpanan</h2>
+          <p id="appStatus" class="inline-note" role="status"></p>
+          <button id="checkUpdateBtn" class="soft-btn">Periksa Update</button>
+          <button id="persistBtn" class="soft-btn">Minta Penyimpanan Persisten</button>
+          <p class="muted small">Data jadwal disimpan lokal; saat integrasi Google diaktifkan, salinannya dikirim ke Google Calendar. Buat backup berkala; menghapus data situs/aplikasi dapat menghapus jadwal. Saat berpindah URL atau perangkat, pulihkan backup JSON.</p>
+        </div>
+</div><div data-settings-panel="data" class="hidden">        <div class="settings-group">
+          <h2>Data</h2>
+          <div class="settings-card vertical">
+            <button id="exportBtn" class="list-action">Backup Data <span>›</span></button>
+            <label class="list-action file-label" tabindex="0" role="button">Pulihkan Backup <span>›</span>
+              <input id="importInput" type="file" accept=".json,application/json" hidden />
+            </label>
+          </div>
+        </div>
+
+</div><div data-settings-panel="categories" class="hidden">        <div class="settings-group">
+          <div class="section-head no-margin">
+            <div>
+              <h2>Kategori</h2>
+              <p class="muted small">Buat warna dan kategori sesuai kebutuhan.</p>
+            </div>
+            <button id="addCategoryBtn" class="soft-btn">＋ Kategori</button>
+          </div>
+          <div id="categoryList" class="stack compact"></div>
+        </div>
+
+</div><div data-settings-panel="reminders" class="hidden">        <div class="settings-group">
+          <h2>Pengingat</h2><p class="muted">Atur waktu pengingat untuk kegiatan Anda.</p><label>Pengingat bawaan jadwal baru<select id="defaultReminder"><option value="-1">Tidak ada</option><option value="5">5 menit sebelum</option><option value="10">10 menit sebelum</option><option value="30">30 menit sebelum</option><option value="1440">1 hari sebelum</option><option value="custom">Kustom</option></select></label><div id="defaultReminderCustom" class="form-grid two hidden"><label>Berapa lama sebelum?<input id="defaultReminderAmount" type="number" min="0" max="40320" step="1" inputmode="numeric" value="5" /></label><label>Satuan<select id="defaultReminderUnit"><option value="1">Menit</option><option value="60">Jam</option><option value="1440">Hari</option></select></label></div><p class="muted small">Maksimal 4 minggu. Angka 0 berarti saat kegiatan dimulai.</p><button id="saveDefaultReminderBtn" class="soft-btn">Simpan Pengingat Bawaan</button><p id="defaultReminderSummary" class="inline-note"></p><details><summary>Lihat Detail</summary><div class="info-card"><strong>Suara dan getaran</strong><p>Pengingat kalender berupa notifikasi. Suara, getaran, dan volume mengikuti pengaturan aplikasi kalender dan iPhone. Fahmi Daily tidak memilih nada alarm.</p></div></details>
+          <div class="settings-card">
+            <div>
+              <strong>Notifikasi</strong>
+              <p class="muted small">Notifikasi lokal saat aplikasi aktif. Untuk pengingat lainnya, gunakan Google Calendar.</p>
+            </div>
+            <button id="notificationBtn" class="soft-btn">Aktifkan</button>
+          </div>
+          <div id="notificationStatus" class="inline-note"></div>
+          <details><summary>Ekspor satu kegiatan ke Kalender (.ics)</summary>          <div class="info-card"><strong>Tambahkan ke Kalender</strong><p>Buka menu ••• pada kegiatan, lalu pilih Tambahkan ke Kalender. File .ics berisi satu kejadian beserta alarm; perubahan jadwal tidak tersinkron otomatis.</p><p>Jika Kalender tidak muncul pada lembar Bagikan, simpan file dahulu. iOS tidak selalu dapat mengimpor .ics langsung dari Files/Safari. Apple mendukung impor lampiran .ics melalui Mail; pilihan ini memerlukan Anda mengirim file sendiri dan melibatkan layanan email. Untuk tetap sepenuhnya lokal, masukkan event secara manual di Kalender jika impor tidak tersedia. Aplikasi tidak mengirim email atau mengupload file.</p><p>Periksa waktu, kalender tujuan, dan alarm sebelum menyimpan. Jika kalender tujuan memakai iCloud/akun lain, event mengikuti sinkronisasi akun itu; pilih kalender lokal bila tersedia.</p></div></details>
+        </div>
+
+        <div class="settings-group"><h2>Cuaca Outdoor</h2><p class="muted">Prakiraan untuk kegiatan Outdoor.</p><label>Ambang kemungkinan hujan (%)<input id="weatherThreshold" type="number" min="1" max="100" step="1" value="60" inputmode="numeric" /></label><button id="weatherSettingsSaveBtn" class="soft-btn">Simpan Ambang</button><button id="weatherRefreshAllBtn" class="soft-btn">Periksa Cuaca Mendatang</button><p class="muted small">Cuaca diperiksa saat aplikasi aktif.</p><details><summary>Lihat Detail</summary><p class="muted small">Pemeriksaan berjalan saat aplikasi aktif. Saat aplikasi ditutup, cuaca tidak diperiksa dan peringatan hujan tidak dikirim. Pengingat kalender yang sudah tersinkron tetap mengikuti pengaturan kalender.</p><p class="muted small">Open-Meteo gratis untuk penggunaan pribadi nonkomersial. Tanpa API key. Hasil dapat berubah dan bukan kepastian. <a href="https://open-meteo.com/en/pricing" target="_blank" rel="noopener">Ketentuan layanan</a></p></details></div>
+</div><div data-settings-panel="calendar" class="hidden">        <div class="settings-group google-sync-group">
+          
           <h2>Google Calendar</h2>
           <p id="googleStatusBadge" class="sync-badge" role="status" aria-live="polite">○ Belum terhubung</p>
           <p id="googleAccount" class="account-line"></p>
           <p id="googleLastSync" class="muted small"></p>
-          <p class="muted">Sinkron otomatis saat aplikasi terbuka dan online.</p>
+          <details><summary>Lihat Detail Sinkron</summary><p>Sinkron otomatis saat aplikasi terbuka dan online.</p></details>
           <div class="sync-actions main-sync-actions">
             <button id="googleConnectBtn" class="primary-btn">Hubungkan Google</button>
             <button id="googleSyncBtn" class="soft-btn" disabled>Sinkronkan Sekarang</button>
@@ -108,65 +149,7 @@
           </details>
           </details>
         </div>
-        <div class="settings-group">
-          <h2>Pengingat</h2><p class="muted">Atur waktu pengingat untuk kegiatan Anda.</p><label>Pengingat bawaan jadwal baru<select id="defaultReminder"><option value="-1">Tidak ada</option><option value="5">5 menit sebelum</option><option value="10">10 menit sebelum</option><option value="30">30 menit sebelum</option><option value="1440">1 hari sebelum</option><option value="custom">Kustom</option></select></label><div id="defaultReminderCustom" class="form-grid two hidden"><label>Berapa lama sebelum?<input id="defaultReminderAmount" type="number" min="0" max="40320" step="1" inputmode="numeric" value="5" /></label><label>Satuan<select id="defaultReminderUnit"><option value="1">Menit</option><option value="60">Jam</option><option value="1440">Hari</option></select></label></div><p class="muted small">Maksimal 4 minggu. Angka 0 berarti saat kegiatan dimulai.</p><button id="saveDefaultReminderBtn" class="soft-btn">Simpan Pengingat Bawaan</button><p id="defaultReminderSummary" class="inline-note"></p><details><summary>Lihat Detail</summary><div class="info-card"><strong>Suara dan getaran</strong><p>Pengingat kalender berupa notifikasi. Suara, getaran, dan volume mengikuti pengaturan aplikasi kalender dan iPhone. Fahmi Daily tidak memilih nada alarm.</p></div></details>
-          <div class="settings-card">
-            <div>
-              <strong>Notifikasi</strong>
-              <p class="muted small">Notifikasi lokal saat aplikasi aktif. Untuk pengingat lainnya, gunakan Google Calendar.</p>
-            </div>
-            <button id="notificationBtn" class="soft-btn">Aktifkan</button>
-          </div>
-          <div id="notificationStatus" class="inline-note"></div>
-          <details><summary>Ekspor satu kegiatan ke Kalender (.ics)</summary>          <div class="info-card"><strong>Tambahkan ke Kalender</strong><p>Buka menu ••• pada kegiatan, lalu pilih Tambahkan ke Kalender. File .ics berisi satu kejadian beserta alarm; perubahan jadwal tidak tersinkron otomatis.</p><p>Jika Kalender tidak muncul pada lembar Bagikan, simpan file dahulu. iOS tidak selalu dapat mengimpor .ics langsung dari Files/Safari. Apple mendukung impor lampiran .ics melalui Mail; pilihan ini memerlukan Anda mengirim file sendiri dan melibatkan layanan email. Untuk tetap sepenuhnya lokal, masukkan event secara manual di Kalender jika impor tidak tersedia. Aplikasi tidak mengirim email atau mengupload file.</p><p>Periksa waktu, kalender tujuan, dan alarm sebelum menyimpan. Jika kalender tujuan memakai iCloud/akun lain, event mengikuti sinkronisasi akun itu; pilih kalender lokal bila tersedia.</p></div></details>
-        </div>
-
-        <div class="settings-group">
-          <div class="section-head no-margin">
-            <div>
-              <h2>Kategori</h2>
-              <p class="muted small">Buat warna dan kategori sesuai kebutuhan.</p>
-            </div>
-            <button id="addCategoryBtn" class="soft-btn">＋ Kategori</button>
-          </div>
-          <div id="categoryList" class="stack compact"></div>
-        </div>
-
-        <div class="settings-group"><h2>Cuaca Outdoor</h2><p class="muted">Prakiraan untuk kegiatan Outdoor.</p><label>Ambang kemungkinan hujan (%)<input id="weatherThreshold" type="number" min="1" max="100" step="1" value="60" inputmode="numeric" /></label><button id="weatherSettingsSaveBtn" class="soft-btn">Simpan Ambang</button><button id="weatherRefreshAllBtn" class="soft-btn">Periksa Cuaca Mendatang</button><p class="muted small">Cuaca diperiksa saat aplikasi aktif.</p><details><summary>Lihat Detail</summary><p class="muted small">Pemeriksaan berjalan saat aplikasi aktif. Saat aplikasi ditutup, cuaca tidak diperiksa dan peringatan hujan tidak dikirim. Pengingat kalender yang sudah tersinkron tetap mengikuti pengaturan kalender.</p><p class="muted small">Open-Meteo gratis untuk penggunaan pribadi nonkomersial. Tanpa API key. Hasil dapat berubah dan bukan kepastian. <a href="https://open-meteo.com/en/pricing" target="_blank" rel="noopener">Ketentuan layanan</a></p></details></div>
-        <div class="settings-group">
-          <h2>Data</h2>
-          <div class="settings-card vertical">
-            <button id="exportBtn" class="list-action">Backup Data <span>›</span></button>
-            <label class="list-action file-label" tabindex="0" role="button">Pulihkan Backup <span>›</span>
-              <input id="importInput" type="file" accept=".json,application/json" hidden />
-            </label>
-          </div>
-        </div>
-
-        <div class="settings-group">
-          <h2>Aplikasi &amp; penyimpanan</h2>
-          <p id="appStatus" class="inline-note" role="status"></p>
-          <button id="checkUpdateBtn" class="soft-btn">Periksa Update</button>
-          <button id="persistBtn" class="soft-btn">Minta Penyimpanan Persisten</button>
-          <p class="muted small">Data jadwal disimpan lokal; saat integrasi Google diaktifkan, salinannya dikirim ke Google Calendar. Buat backup berkala; menghapus data situs/aplikasi dapat menghapus jadwal. Saat berpindah URL atau perangkat, pulihkan backup JSON.</p>
-        </div>
-        <div class="settings-group">
-          <h2>Instal di iPhone</h2>
-          <button class="soft-btn install-help">Cara Pasang di iPhone</button>
-          <details><summary>Lihat Detail</summary><div class="info-card">
-            <ol>
-              <li>Buka alamat PWA ini di <strong>Safari</strong>.</li>
-              <li>Tekan tombol <strong>Bagikan</strong>.</li>
-              <li>Pilih <strong>Tambahkan ke Layar Utama</strong>.</li>
-              <li>Tekan <strong>Add / Tambah</strong>.</li><li>Buka <strong>Fahmi Daily</strong> dari Home Screen.</li>
-            </ol>
-          </div></details>
-        </div>
-
-        <div class="settings-group footer-note">
-          <p>Fahmi Daily PWA • data lokal dengan sinkron Google Calendar opsional.</p>
-        </div>
-      </section>
+</div>      </section>
     </main>
 
     <nav class="bottom-nav" aria-label="Navigasi utama">
@@ -203,10 +186,10 @@
         </label>
         <div class="form-grid two">
           <label>Mulai
-            <input id="eventStartTime" type="time" required />
+            <select id="eventStartTime" required></select>
           </label>
           <label>Selesai
-            <input id="eventEndTime" type="time" required />
+            <select id="eventEndTime" required></select>
           </label>
         </div>
         <label>Ulangi
@@ -302,13 +285,6 @@
     </form>
   </dialog>
 
-  <dialog id="installDialog" class="center-dialog" aria-labelledby="installTitle">
-    <div class="modal-card"><h2 id="installTitle">Cara Pasang di iPhone</h2>
-      <ol><li>Buka URL Fahmi Daily menggunakan Safari.</li><li>Tekan Share / Bagikan.</li><li>Pilih Add to Home Screen / Tambahkan ke Layar Utama. Jika tersembunyi, lihat daftar aksi lainnya.</li><li>Tekan Add / Tambah. Jika ada pilihan Buka sebagai App, aktifkan.</li><li>Buka Fahmi Daily dari Home Screen.</li></ol>
-      <p class="muted small">Tunggu status offline siap sebelum mencoba mode pesawat.</p>
-      <button id="installCloseBtn" class="primary-btn">Mengerti</button>
-    </div>
-  </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="./google-config.js" defer></script>
   <script src="./google-calendar.js" defer></script>

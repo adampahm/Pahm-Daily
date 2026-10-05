@@ -408,7 +408,7 @@
       try{state.settings.defaultReminderMinutes=minutes;saveState();renderSettings();toast('Pengingat bawaan disimpan. Jadwal lama tetap sama.');}
       catch(error){handleStorageError(error);}
     };
-    $('calendarSettingsBtn').onclick=()=>document.querySelector('[data-page="settingsPage"]').click();
+    $('calendarSettingsBtn').onclick=()=>{document.querySelector('[data-page="settingsPage"]').click();showSettingsMenu('calendar');};
   }
 
   function renderSettings(){
@@ -425,9 +425,24 @@
     if(state.categories.some(c=>c.id===current)) $('eventCategory').value=current;
   }
 
+  function populateTimeOptions(start='',end=''){
+    ['eventStartTime','eventEndTime'].forEach((id,i)=>{
+      const saved=i?end:start;
+      const times=Array.from({length:288},(_,n)=>String(Math.floor(n/12)).padStart(2,'0')+':'+String(n%12*5).padStart(2,'0'));
+      if(/^\d{2}:\d{2}$/.test(saved) && !times.includes(saved))times.push(saved);
+      times.sort();
+      $(id).innerHTML=times.map(t=>`<option value="${t}">${t.replace(':','.')}</option>`).join('');
+    });
+  }
+  function showSettingsMenu(panel=''){
+    $('settingsMenu').classList.toggle('hidden',!!panel);
+    $('settingsBackRow').classList.toggle('hidden',!panel);
+    document.querySelectorAll('[data-settings-panel]').forEach(el=>el.classList.toggle('hidden',el.dataset.settingsPanel!==panel));
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
   function openNewEvent(dk=dateKey(new Date())){
     editingContext=null; $('eventDialogTitle').textContent='Tambah Jadwal';
-    $('eventForm').reset(); populateCategorySelect();
+    $('eventForm').reset(); populateCategorySelect(); populateTimeOptions();
     $('eventCategory').value=state.categories[0]?.id || 'pribadi'; setReminderFields('event',state.settings.defaultReminderMinutes ?? -1); $('eventDate').value=dk;
     $('eventStartTime').value='09:00'; $('eventEndTime').value='10:00'; $('eventRecurrence').value='none';
     $('eventRecurrence').disabled=false; clearWeekdayPicker(); updateRecurrenceFields(); $('eventDialog').showModal(); weatherUI?.open();
@@ -445,7 +460,7 @@
     if(scope==='all') Object.assign(o,{...ev,date:ev.date,activityType:ev.activityType || 'indoor',weatherLocation:ev.weatherLocation || null,weatherAccepted:ev.weatherAccepted || '',status:ev.seriesStatus || 'scheduled'});
     editingContext={eventId, date:dk, scope}; $('eventDialogTitle').textContent=scope==='one'?'Ubah Kejadian':'Ubah Jadwal'; populateCategorySelect();
     $('eventTitle').value=o.title; $('eventCategory').value=o.categoryId; setReminderFields('event',Number(o.reminderMinutes ?? -1));
-    $('eventDate').value=o.date; $('eventStartTime').value=o.startTime; $('eventEndTime').value=o.endTime; $('eventLocation').value=o.location||''; $('eventNotes').value=o.notes||'';
+    populateTimeOptions(o.startTime,o.endTime); $('eventDate').value=o.date; $('eventStartTime').value=o.startTime; $('eventEndTime').value=o.endTime; $('eventLocation').value=o.location||''; $('eventNotes').value=o.notes||'';
     if(scope==='one'){ $('eventRecurrence').value='none'; $('eventRecurrence').disabled=true; $('eventUntil').value=''; }
     else { $('eventRecurrence').disabled=false; $('eventRecurrence').value=ev.recurrence?.type||'none'; $('eventUntil').value=ev.recurrence?.until||''; setWeekdayPicker(ev.recurrence?.weekdays||[]); }
     updateRecurrenceFields(); $('eventDialog').showModal(); weatherUI?.open(o);
@@ -698,8 +713,10 @@
   }
 
   function setupEvents(){
+    document.querySelectorAll('[data-settings-open]').forEach(b=>b.onclick=()=>showSettingsMenu(b.dataset.settingsOpen));
+    $('settingsBackBtn').onclick=()=>showSettingsMenu();
     document.querySelectorAll('.nav-item').forEach(b=>b.onclick=()=>{
-      currentPage=b.dataset.page; document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===currentPage)); document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x===b)); renderTopbar(); if(currentPage==='calendarPage')renderCalendar(); if(currentPage==='settingsPage')renderSettings(); window.scrollTo({top:0,behavior:'smooth'});
+      currentPage=b.dataset.page; document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===currentPage)); document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x===b)); renderTopbar(); googleSync?.status(); if(currentPage==='calendarPage')renderCalendar(); if(currentPage==='settingsPage'){renderSettings();showSettingsMenu();} window.scrollTo({top:0,behavior:'smooth'});
     });
     $('quickAddBtn').onclick=()=>openNewEvent(currentPage==='calendarPage'?dateKey(selectedDate):dateKey(new Date()));
     $('closeEventBtn').onclick=()=>{$('eventDialog').close();editingContext=null;};
@@ -739,8 +756,7 @@
   let offlineReady=false;
   function updateAppStatus(){
     document.documentElement.classList.toggle('standalone',isStandalone());
-    $('installHint').classList.toggle('hidden',!isIOS() || isStandalone());
-    $('appStatus').textContent=`v1.6.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
+    $('appStatus').textContent=`v1.7.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
   }
   async function registerSW(){
     if(!('serviceWorker' in navigator) || !window.isSecureContext){updateAppStatus();return;}
@@ -764,8 +780,6 @@
   }
   function setupPlatform(){
     if(storageMessage){$('storageWarning').textContent=storageMessage;$('storageWarning').classList.remove('hidden');}
-    document.querySelectorAll('.install-help').forEach(b=>b.onclick=()=>$('installDialog').showModal());
-    $('installCloseBtn').onclick=()=>$('installDialog').close();
     $('updateBtn').onclick=()=>{
       if(document.querySelector('dialog[open]')){toast('Simpan atau tutup form terlebih dahulu.');return;}
       if(confirm('Perbarui aplikasi sekarang? Halaman akan dimuat ulang.')){applyUpdate=true;swRegistration?.waiting?.postMessage({type:'SKIP_WAITING'});}
@@ -809,7 +823,8 @@
       const icon=status.error?'!':status.running?'↻':connected?'✓':'○';
       $('googleStatusBadge').textContent=icon+' '+label;
       $('googleStatusBadge').classList.toggle('sync-error',status.error);
-      $('googleBannerLabel').textContent='Google Calendar · '+label;
+      $('googleBannerLabel').textContent='Sinkron gagal. Periksa koneksi kalender.';
+      $('googleSyncBanner').classList.toggle('hidden',!status.error || currentPage==='settingsPage');
       $('googleSyncBanner').classList.toggle('sync-error',status.error);
       $('googleErrorHelp').classList.toggle('hidden',!status.error);
       $('googleConnectBtn').className=connected?'soft-btn':'primary-btn';

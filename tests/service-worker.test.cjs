@@ -15,7 +15,7 @@ vm.createContext(ctx);vm.runInContext(fs.readFileSync(require('path').join(__dir
 const dispatch=async(type,event={})=>{let pending;handlers[type]({...event,waitUntil:p=>pending=p});await pending;};
 const fetchEvent=async(url,mode='cors',method='GET')=>{let response;handlers.fetch({request:{url,mode,method},respondWith:p=>response=p});return response?await response:undefined};
 (async()=>{
-await dispatch('install');assert.equal(assets.length,12);assert(!skip);
+await dispatch('install');assert.equal(assets.length,14);assert(!skip);
 await dispatch('activate');assert(claimed);assert(!stores.has('fahmi-daily-v1'));assert(!stores.has('fahmi-daily:'+scope+':old'));assert(stores.has('other-app-v2'));assert(stores.has('fahmi-daily:https://example.test/another/:old'));
 online=false;
 for(const path of ['','index.html','unknown-route?x=1']){const response=await fetchEvent(scope+path,'navigate');assert((await response.text()).startsWith('<!doctype html>'))}

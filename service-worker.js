@@ -1,10 +1,10 @@
 'use strict';
 // Increment VERSION for each release that changes the app shell.
-const VERSION = 'v1.6.0-compact1';
+const VERSION = 'v1.7.0-minimal1';
 const PREFIX = `fahmi-daily:${self.registration.scope}:`;
 const CACHE = PREFIX + VERSION;
 const ASSETS = ['index.html','styles.css','app.js','google-config.js','google-calendar.js','google-server.js','weather.js','weather-ui.js','manifest.webmanifest',
-  'icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png'];
+  'icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png','icons/favicon.png','icons/maskable-512.png'];
 const absolute = path => new URL(path,self.registration.scope).href;
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(
