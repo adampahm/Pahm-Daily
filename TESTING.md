@@ -1,21 +1,10 @@
-# Pemeriksaan v1.3.0 — 4 Oktober 2026
+# Verifikasi v1.4.0
 
-- 14 pengujian aplikasi: storage versi lama, quota/rollback, konflik tab, CRUD/pengulangan, JSON/ICS dan reminder.
-- 23 pengujian sinkron kalender: 18 regresi + 5 baru untuk provider backend, reload, perpanjangan, 401, konkurensi dan pembatalan.
-- 10 pengujian autentikasi backend dan browser adapter: memakai SQLite nyata (`node:sqlite`) dengan respons Google simulasi. OAuth state, PKCE, kode sekali pakai dan masa berlaku, pembatasan origin/akun, penyimpanan terenkripsi, refresh, revocation, serta disconnect/refresh race lolos.
-- Service worker: pemasangan 10 aset core, cache berdasarkan scope, offline dan aktivasi update lolos dengan mock.
-- Browser nyata: aplikasi v1.3.0 dimuat, Pengaturan terbuka tanpa console error, kode login yang tidak valid ditolak, viewport 390x844 tidak melebar horizontal (documentWidth 375).
-- JavaScript syntax dan validasi aset/ID HTML diperiksa sebelum ZIP dibuat.
+- 17 tes aplikasi: data v1, backup/restore, pengingat 5 menit/kustom, batas 28 hari, bawaan tidak mengubah jadwal lama, pengecualian berulang, lokal 0/28 hari dan deduplikasi.
+- 26 tes Google Calendar dengan Google dimock: regresi OAuth/sinkron, pembaruan pengingat memakai ID yang sama tanpa POST/DELETE, normalisasi waktu Google, retry respons PUT hilang, waktu sinkron terakhir setelah reload.
+- 10 tes backend/browser authentication dengan SQLite nyata dan Google dimock. Kode backend tidak berubah.
+- Tes service worker: instalasi atomik, cache sesuai scope, offline, update, sumber eksternal tidak dicache.
+- Browser: viewport 320,390,1280 piksel; tidak ada overflow horizontal; bawaan 5 menit, formulir kustom 2 jam, simpan jadwal, penolakan nilai 40321, log tanpa error/warning. Screenshot adalah pratinjau lokal dengan data contoh dan Google belum terhubung.
+- JavaScript, ID HTML, aset, manifest dan integritas ZIP diperiksa.
 
-Belum diuji: Google OAuth dengan akun nyata, penerbitan Cloudflare, batas CPU Worker Free, pemindahan konteks login Safari/Home Screen iPhone, reminder iPhone fisik. Pengguna perlu memasang konfigurasi terlebih dahulu, lalu mengikuti uji login/reload/lebih dari satu jam dalam panduan.
-
-Tidak ada Client Secret atau token pengguna yang digunakan pada pengujian. Paket tidak memuat rahasia produksi. Source worker yang disertakan tidak mencetak kredensial ke console; matikan invocation logs sebelum OAuth nyata.
-
-Jalankan dari folder paket memakai Node 24+:
-
-```text
-node app/tests/app.test.cjs
-node app/tests/google-calendar.test.cjs
-node app/tests/service-worker.test.cjs
-node backend/test.mjs
-```
+Tes OAuth/Calendar memakai mock, bukan login Google produksi. Pengingat suara pada perangkat fisik dan sinkron versi ini di akun pengguna perlu diperiksa setelah unggah. Integrasi versi 1.3 telah dikonfirmasi berfungsi oleh pengguna.

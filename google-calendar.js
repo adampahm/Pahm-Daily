@@ -12,6 +12,14 @@
   const stamp = d => d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
   const uuid = () => crypto.randomUUID().replace(/-/g,'');
   const hash = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(n=>n.toString(16).padStart(2,'0')).join('');
+  function sameExceptReminder(remote,body){
+    // Google may omit empty strings and return dateTime with a numeric UTC offset.
+    const canonical=e=>({summary:e.summary || '',location:e.location || '',description:e.description || '',
+      start:Date.parse(e.start?.dateTime),end:Date.parse(e.end?.dateTime),
+      startZone:e.recurrence?e.start?.timeZone || '':'',endZone:e.recurrence?e.end?.timeZone || '':'',
+      recurrence:[...(e.recurrence || [])].sort(),transparency:e.transparency || 'opaque'});
+    return JSON.stringify(canonical(remote))===JSON.stringify(canonical(body));
+  }
   function occursOn(event,date){
     if(date<event.date || (event.recurrence?.until && date>event.recurrence.until))return false;
     const type=event.recurrence?.type || 'none',day=localDate(date).getDay();
@@ -80,7 +88,7 @@
         config=parsed;
       }
     } catch {storageError=true;}
-    let accessToken='',expiresAt=0,account=null,epoch=0,running=false,again=false,pending=true,lastSync='',timer;
+    let accessToken='',expiresAt=0,account=null,epoch=0,running=false,again=false,pending=true,lastSync=config.lastSync || '',timer;
     const emit = (message,error=false) => onStatus({message,error,enabled:config.enabled,connected:!!account && !!accessToken && clock()<expiresAt,account:account?.email || '',calendarId:account?config.accounts[account.sub]?.calendarId || '':'',running,pending,lastSync,clientId:config.clientId});
     function persist(){
       if(storageError)throw new Error('Konfigurasi sinkron tidak dapat dibaca. Jadwal lokal aman; hubungi bantuan sebelum mengganti konfigurasi.');
@@ -191,6 +199,12 @@
             if(force)await api(`/calendars/${encodeURIComponent(target.calendarId)}/events/${existing.id}?sendUpdates=none`,{method:'PUT',context,body:{...item.body,extendedProperties:{private:{fahmiOwner:target.owner,fahmiKey:keyHash,fahmiContent:contentHash}}}});
             continue;
           }
+          // Reminder-only edits preserve the existing Google event id and recurrence.
+          const prior=remote.find(e=>e.extendedProperties?.private?.fahmiKey===keyHash);
+          if(prior && sameExceptReminder(prior,item.body)){
+            await api(`/calendars/${encodeURIComponent(target.calendarId)}/events/${encodeURIComponent(prior.id)}?sendUpdates=none`,{method:'PUT',context,body:{...item.body,extendedProperties:{private:{fahmiOwner:target.owner,fahmiKey:keyHash,fahmiContent:contentHash}}}});
+            target.records[keyHash]={id:prior.id,hash:contentHash};persist();keep.add(prior.id);continue;
+          }
           // Persist the id before POST so a timeout can be retried idempotently.
           let record=target.records[keyHash];
           if(!record || record.hash!==contentHash){record={id:uuid(),hash:contentHash};target.records[keyHash]=record;}
@@ -223,7 +237,7 @@
             catch(error){if(error.status!==404 && error.status!==410)throw error;}
           }
         }
-        pending=false;lastSync=new Date(clock()).toLocaleString('id-ID');emit(`Sinkron selesai: ${plan.length} event/rangkaian. Kalender iPhone akan mengikuti pembaruan akun Google.`);
+        pending=false;lastSync=new Date(clock()).toLocaleString('id-ID');config.lastSync=lastSync;persist();emit(`Sinkron selesai: ${plan.length} event/rangkaian. Kalender iPhone akan mengikuti pembaruan akun Google.`);
       } catch(error){emit(error.message,true);}
       finally {running=false;emitStatus();if(again && authorized())queue();}
     }

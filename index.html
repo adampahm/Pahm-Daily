@@ -21,12 +21,12 @@
         <p class="eyebrow" id="topEyebrow">Penjadwalan pribadi</p>
         <h1 id="topTitle">Hari Ini</h1>
       </div>
-      <button id="quickAddBtn" class="icon-btn primary-icon" aria-label="Tambah jadwal">＋</button>
+      <button id="quickAddBtn" class="primary-btn" aria-label="Tambah jadwal">＋ Jadwal</button>
     </header>
 
     <main class="content" id="mainContent">
       <aside id="installHint" class="info-card hidden"><strong>Pasang Fahmi Daily ke iPhone:</strong><p>Tekan tombol Share → Add to Home Screen.</p><button class="soft-btn install-help">Cara Pasang di iPhone</button></aside>
-      <aside id="googleSyncBanner" class="info-card hidden" role="status" aria-live="polite"></aside>
+      <aside id="googleSyncBanner" class="calendar-banner" role="status" aria-live="polite"><strong id="googleBannerLabel">Google Calendar · Belum terhubung</strong><button id="calendarSettingsBtn" class="text-btn">Kelola</button></aside>
       <aside id="storageWarning" class="info-card hidden" role="alert"></aside>
       <aside id="updateNotice" class="info-card hidden"><p>Versi baru siap. Simpan form dan buat backup sebelum memperbarui.</p><button id="updateBtn" class="soft-btn">Perbarui Aplikasi</button></aside>
       <section id="todayPage" class="page active" aria-label="Hari Ini">
@@ -74,46 +74,50 @@
 
       <section id="settingsPage" class="page" aria-label="Pengaturan">
         <div class="settings-group google-sync-group">
-          <h2>Google Calendar otomatis</h2>
-          <p class="muted small">Setelah terhubung, jadwal lokal dikirim ke kalender khusus Fahmi Daily. Tambah, edit, hapus dan pengulangan mengikuti aplikasi ini. Server memperpanjang akses Google otomatis saat diperlukan. Koneksi internet diperlukan untuk sinkron.</p>
-          <div class="info-card"><p>Saat diaktifkan, judul, tanggal/jam, lokasi, catatan, kategori dan pengingat dikirim ke Google. Izin terbatas pada kalender yang dibuat aplikasi. Pilih akun Google yang sama di Kalender iPhone.</p><p>Cloudflare menyimpan izin Google secara terenkripsi. Koneksi perangkat bertahan setelah reload, maksimal 90 hari; izin yang dicabut tetap memerlukan login ulang. Jadwal tetap dikirim langsung ke Google. Perubahan dari Kalender iPhone/Google tidak diimpor ke Fahmi Daily. Buat perubahan melalui aplikasi ini dan tetap lakukan backup JSON.</p></div>
+          <p class="eyebrow">KONEKSI KALENDER</p>
+          <h2>Google Calendar</h2>
+          <p id="googleStatusBadge" class="sync-badge" role="status" aria-live="polite">○ Belum terhubung</p>
+          <p id="googleAccount" class="account-line"></p>
+          <p id="googleLastSync" class="muted small"></p>
+          <p class="muted">Perubahan jadwal disinkronkan saat aplikasi terbuka dan terhubung internet. Ubah jadwal melalui Fahmi Daily.</p>
+          <div class="sync-actions main-sync-actions">
+            <button id="googleConnectBtn" class="primary-btn">Hubungkan Google</button>
+            <button id="googleSyncBtn" class="soft-btn" disabled>Sinkronkan Sekarang</button>
+          </div>
+          <p id="googleSyncStatus" class="inline-note" role="status" aria-live="polite"></p>
+          <p id="googleErrorHelp" class="error-help hidden">Periksa koneksi internet lalu tekan Sinkronkan Sekarang. Jika izin kedaluwarsa, tekan Hubungkan Google. Untuk masalah kalender tujuan, buka Pengaturan lanjutan.</p>
+          <a id="googleAuthLink" class="hidden" target="_blank" rel="noopener noreferrer">Buka halaman login Google</a>
+          <details class="advanced-settings"><summary>Pengaturan lanjutan</summary>
+          <p class="muted small">Google menerima judul, waktu, lokasi, catatan, kategori, dan pengingat. Cloudflare menyimpan izin Google secara terenkripsi. Perubahan dari Google/ Kalender iPhone tidak diimpor ke aplikasi. Backup JSON tetap diperlukan.</p>
           <label class="sync-label">Client ID dari server
             <input id="googleClientId" readonly autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="123456-…apps.googleusercontent.com" />
           </label>
-          <p class="muted small">Client ID diisi otomatis dari server setelah Siapkan Koneksi. <a href="./GOOGLE-CALENDAR.md" target="_blank" rel="noopener">Panduan aktivasi</a></p>
-          <div class="sync-actions">
-            <button id="googlePrepareBtn" class="soft-btn">Siapkan Koneksi Google</button>
-            <button id="googleConnectBtn" class="primary-btn" disabled>Hubungkan Google</button>
-            <button id="googleSyncBtn" class="soft-btn" disabled>Sinkron Sekarang</button>
-            <button id="googleDisconnectBtn" class="soft-btn" disabled>Hentikan Sinkron</button>
-          </div>
-          <a id="googleAuthLink" class="hidden" target="_blank" rel="noopener noreferrer">Buka halaman login Google</a>
+          <p class="muted small">Client ID diisi otomatis dari server. <a href="./GOOGLE-CALENDAR.md" target="_blank" rel="noopener">Panduan aktivasi</a></p>
+          <div class="sync-actions"><button id="googlePrepareBtn" class="soft-btn">Periksa Koneksi Server</button><button id="googleDisconnectBtn" class="soft-btn" disabled>Hentikan Sinkron</button></div>
           <details><summary>Masukkan kode jika login tidak kembali otomatis</summary>
             <p class="muted small">Salin kode dari halaman hasil login Google, lalu tempel di aplikasi asal ini. Kode berlaku 5 menit. Jangan memulai koneksi kedua sebelum memasukkan kode pertama.</p>
             <label class="sync-label">Kode koneksi<textarea id="googleConnectionCode" rows="3" autocomplete="off" autocapitalize="none" spellcheck="false"></textarea></label>
             <button id="googleCompleteBtn" class="soft-btn">Selesaikan Koneksi</button>
           </details>
-          <p id="googleSyncStatus" class="inline-note" role="status" aria-live="polite"></p>
-          <p id="googleAccount" class="inline-note"></p>
-          <p id="googleLastSync" class="inline-note"></p>
           <p id="googleTarget" class="inline-note"></p>
           <details><summary>Pulihkan tautan kalender yang sudah dibuat</summary>
             <p class="muted small">Gunakan bila pembuatan kalender sempat gagal dikonfirmasi atau pindah browser/perangkat. Ambil ID dari Google Calendar → Settings → kalender Fahmi Daily → Integrate calendar. Pulihkan backup jadwal lokal lebih dahulu.</p>
             <label class="sync-label">ID Kalender<input id="googleRecoveryId" autocapitalize="none" spellcheck="false" placeholder="…@group.calendar.google.com" /></label>
             <button id="googleRecoverBtn" class="soft-btn" disabled>Pulihkan Tautan Kalender</button>
           </details>
+          </details>
         </div>
         <div class="settings-group">
-          <h2>Pengingat</h2>
+          <h2>Pengingat</h2><p class="muted">Atur waktu pengingat untuk kegiatan Anda.</p><label>Pengingat bawaan jadwal baru<select id="defaultReminder"><option value="-1">Tidak ada</option><option value="5">5 menit sebelum</option><option value="10">10 menit sebelum</option><option value="30">30 menit sebelum</option><option value="1440">1 hari sebelum</option><option value="custom">Kustom</option></select></label><div id="defaultReminderCustom" class="form-grid two hidden"><label>Berapa lama sebelum?<input id="defaultReminderAmount" type="number" min="0" max="40320" step="1" inputmode="numeric" value="5" /></label><label>Satuan<select id="defaultReminderUnit"><option value="1">Menit</option><option value="60">Jam</option><option value="1440">Hari</option></select></label></div><p class="muted small">Maksimal 4 minggu. Angka 0 berarti saat kegiatan dimulai.</p><button id="saveDefaultReminderBtn" class="soft-btn">Simpan Pengingat Bawaan</button><p id="defaultReminderSummary" class="inline-note"></p><div class="info-card"><strong>Suara dan getaran</strong><p>Pengingat kalender berupa notifikasi. Suara, getaran, dan volume mengikuti pengaturan aplikasi kalender dan iPhone. Fahmi Daily tidak memilih nada alarm.</p></div>
           <div class="settings-card">
             <div>
               <strong>Notifikasi</strong>
-              <p class="muted small">Reminder lokal hanya diperiksa saat aplikasi aktif. Saat aplikasi ditutup atau iPhone terkunci, reminder tidak dijamin. Gunakan Tambahkan ke Kalender untuk kegiatan penting.</p>
+              <p class="muted small">Notifikasi lokal diperiksa saat aplikasi aktif. Untuk pengingat saat iPhone terkunci, sinkronkan ke Google Calendar dan izinkan notifikasi kalender di iPhone.</p>
             </div>
             <button id="notificationBtn" class="soft-btn">Aktifkan</button>
           </div>
           <div id="notificationStatus" class="inline-note"></div>
-          <div class="info-card"><strong>Tambahkan ke Kalender</strong><p>Buka menu ••• pada kegiatan, lalu pilih Tambahkan ke Kalender. File .ics berisi satu kejadian beserta alarm; perubahan jadwal tidak tersinkron otomatis.</p><p>Jika Kalender tidak muncul pada lembar Bagikan, simpan file dahulu. iOS tidak selalu dapat mengimpor .ics langsung dari Files/Safari. Apple mendukung impor lampiran .ics melalui Mail; pilihan ini memerlukan Anda mengirim file sendiri dan melibatkan layanan email. Untuk tetap sepenuhnya lokal, masukkan event secara manual di Kalender jika impor tidak tersedia. Aplikasi tidak mengirim email atau mengupload file.</p><p>Periksa waktu, kalender tujuan, dan alarm sebelum menyimpan. Jika kalender tujuan memakai iCloud/akun lain, event mengikuti sinkronisasi akun itu; pilih kalender lokal bila tersedia.</p></div>
+          <details><summary>Ekspor satu kegiatan ke Kalender (.ics)</summary>          <div class="info-card"><strong>Tambahkan ke Kalender</strong><p>Buka menu ••• pada kegiatan, lalu pilih Tambahkan ke Kalender. File .ics berisi satu kejadian beserta alarm; perubahan jadwal tidak tersinkron otomatis.</p><p>Jika Kalender tidak muncul pada lembar Bagikan, simpan file dahulu. iOS tidak selalu dapat mengimpor .ics langsung dari Files/Safari. Apple mendukung impor lampiran .ics melalui Mail; pilihan ini memerlukan Anda mengirim file sendiri dan melibatkan layanan email. Untuk tetap sepenuhnya lokal, masukkan event secara manual di Kalender jika impor tidak tersedia. Aplikasi tidak mengirim email atau mengupload file.</p><p>Periksa waktu, kalender tujuan, dan alarm sebelum menyimpan. Jika kalender tujuan memakai iCloud/akun lain, event mengikuti sinkronisasi akun itu; pilih kalender lokal bila tersedia.</p></div></details>
         </div>
 
         <div class="settings-group">
@@ -188,14 +192,10 @@
             <select id="eventCategory"></select>
           </label>
           <label>Pengingat
-            <select id="eventReminder">
-              <option value="-1">Tanpa pengingat</option>
-              <option value="10">10 menit sebelum</option>
-              <option value="30">30 menit sebelum</option>
-              <option value="1440">1 hari sebelum</option>
-            </select>
+<select id="eventReminder"><option value="-1">Tidak ada</option><option value="5">5 menit sebelum</option><option value="10">10 menit sebelum</option><option value="30">30 menit sebelum</option><option value="1440">1 hari sebelum</option><option value="custom">Kustom</option></select>
           </label>
         </div>
+<div id="eventReminderCustom" class="form-grid two hidden"><label>Berapa lama sebelum?<input id="eventReminderAmount" type="number" min="0" max="40320" step="1" inputmode="numeric" value="5" /></label><label>Satuan<select id="eventReminderUnit"><option value="1">Menit</option><option value="60">Jam</option><option value="1440">Hari</option></select></label></div><p class="muted small">Pengingat melalui notifikasi kalender; maksimal 4 minggu sebelum kegiatan.</p>
         <label>Tanggal
           <input id="eventDate" type="date" required />
         </label>
@@ -227,10 +227,10 @@
         <label id="untilField" class="hidden">Berakhir pada (opsional)
           <input id="eventUntil" type="date" />
         </label>
-        <label>Lokasi <span class="optional">opsional</span>
+        <label><span>Lokasi <span class="optional">opsional</span></span>
           <input id="eventLocation" maxlength="120" placeholder="Contoh: KU3.04.07" />
         </label>
-        <label>Catatan <span class="optional">opsional</span>
+        <label><span>Catatan <span class="optional">opsional</span></span>
           <textarea id="eventNotes" rows="3" maxlength="500" placeholder="Tambahkan catatan"></textarea>
         </label>
       </div>

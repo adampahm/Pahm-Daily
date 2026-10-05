@@ -9,11 +9,11 @@ function fixture(raw=null){
   window:{addEventListener(){},matchMedia(){return{matches:false}},isSecureContext:true},navigator:{userAgent:'iPhone',platform:'iPhone',maxTouchPoints:1,standalone:false},
   document:{hidden:false,getElementById:el,querySelectorAll(){return[]}},alert:m=>alerts.push(m),confirm:()=>true,
   localStorage:{getItem:k=>data.get(k)??null,setItem(k,v){if(fail)throw Error('quota');data.set(k,v)}}};
- const code=source.slice(0,source.indexOf('  setupEvents();'))+`
+ const code=source.slice(0,source.indexOf('  setupReminderSettings(); setupEvents();'))+`
  const originalCheckReminders=checkReminders;
  renderAll=()=>{};renderCalendar=()=>{};populateCategorySelect=()=>{};updateRecurrenceFields=()=>{};clearWeekdayPicker=()=>{};setWeekdayPicker=()=>{};
  toast=()=>{};checkReminders=()=>{};chooseScope=async()=>globalThis.scope||'one';shareOrDownload=async f=>globalThis.files.push(f);
- globalThis.api={defaults,normalizeState,occursOn,occurrenceFor,occurrencesBetween,commitForm,deleteFlow,setStatusFlow,openNewEvent,openEditEvent,importBackup,exportBackup,calendarICS,foldICS,isStandalone,isIOS,saveState,candidateConflicts,checkReminders:originalCheckReminders,
+ globalThis.api={validReminder,readReminderFields,setReminderFields,validateForm,gatherForm,defaults,normalizeState,occursOn,occurrenceFor,occurrencesBetween,commitForm,deleteFlow,setStatusFlow,openNewEvent,openEditEvent,importBackup,exportBackup,calendarICS,foldICS,isStandalone,isIOS,saveState,candidateConflicts,checkReminders:originalCheckReminders,
  get state(){return state},set state(v){state=v},set editing(v){editingContext=v},get blocked(){return storageBlocked}};
 })();`;
  ctx.files=files;vm.createContext(ctx);vm.runInContext(code,ctx);
@@ -47,5 +47,36 @@ async function test(name,fn){await fn();results.push({name,status:'PASS'});conso
   fail=false;await f.api.checkReminders();assert.equal(count,2);assert.equal(Object.keys(f.api.state.notified).length,1);
   await f.api.checkReminders();assert.equal(count,2);f.api.state.notified={};f.ctx.document.hidden=true;await f.api.checkReminders();assert.equal(count,2);
  });
+ await test('5-minute and custom reminder persistence, backup, exceptions and limits',async()=>{
+  const f=fixture();
+  for(const minutes of [-1,0,5,10,30,1440,90,40320]){
+    assert(f.api.validReminder(minutes));f.api.commitForm({...event,reminderMinutes:minutes});
+    const raw=f.data.get('fahmiDailyPWA.v1');assert.equal(fixture(raw).api.state.events.at(-1).reminderMinutes,minutes);
+  }
+  for(const minutes of [-2,40321,1.5,NaN,Infinity])assert(!f.api.validReminder(minutes));
+  const b=JSON.parse(f.data.get('fahmiDailyPWA.v1'));b.events[0].reminderMinutes=40321;assert.throws(()=>f.api.normalizeState(b));
+  b.events[0].reminderMinutes=5;b.settings.defaultReminderMinutes=1.5;assert.throws(()=>f.api.normalizeState(b));
+  const e=f.api.state.events.at(-1);f.api.editing={eventId:e.id,date:e.date,scope:'one'};f.api.commitForm({...event,reminderMinutes:90});
+  await f.api.exportBackup();const g=fixture();await g.api.importBackup(f.files.at(-1));assert.equal(g.api.state.exceptions[e.id+'|'+e.date].overrides.reminderMinutes,90);
+  assert(f.api.calendarICS({...f.api.occurrenceFor(e,new Date(2026,9,4,12)),reminderMinutes:5}).includes('TRIGGER:-PT5M'));
+ });
+ await test('Default only applies to new schedules, custom editing roundtrip and unit validation',()=>{
+  const f=fixture();const old=JSON.stringify(f.api.state.events);f.api.state.settings.defaultReminderMinutes=5;f.api.saveState();f.api.openNewEvent();assert.equal(f.el('eventReminder').value,'5');assert.equal(JSON.stringify(f.api.state.events),old);
+  for(const minutes of [0,90,120,2880,40320]){f.api.setReminderFields('event',minutes);assert.equal(f.api.readReminderFields('event'),minutes);}
+  f.el('eventReminder').value='custom';f.el('eventReminderAmount').value='2';f.el('eventReminderUnit').value='60';assert.equal(f.api.readReminderFields('event'),120);
+  f.el('eventReminderAmount').value='1.5';assert(Number.isNaN(f.api.readReminderFields('event')));
+  f.el('eventReminderAmount').value='';assert(Number.isNaN(f.api.readReminderFields('event')));
+  assert(f.api.validateForm({...event,reminderMinutes:40321}).includes('Pengingat'));
+ });
+ await test('Local custom reminders cover 28 days and zero-minute start alerts without repeating',async()=>{
+  const f=fixture();let count=0;let fixed=new Date(2026,9,5,9,0).getTime();
+  f.ctx.Date=class extends Date{constructor(...args){super(...(args.length?args:[fixed]));}static now(){return fixed;}};
+  f.ctx.Notification={permission:'granted'};f.ctx.window.Notification=f.ctx.Notification;
+  f.ctx.navigator.serviceWorker={getRegistration:async()=>({showNotification:async()=>{count++;}})};
+  f.api.state.events=[{...event,id:'long-reminder',date:'2026-11-02',startTime:'09:00',endTime:'10:00',reminderMinutes:40320,recurrence:{type:'none'}},{...event,id:'zero-reminder',date:'2026-10-05',startTime:'09:00',endTime:'10:00',reminderMinutes:0,recurrence:{type:'none'}}];
+  f.api.saveState();await f.api.checkReminders();assert.equal(count,2);await f.api.checkReminders();assert.equal(count,2);
+  fixed+=15*86400000;await f.api.checkReminders();assert.equal(count,2);
+ });
  console.log(`${results.length} app tests passed.`);
 })().catch(e=>{console.error(e);process.exitCode=1});
+

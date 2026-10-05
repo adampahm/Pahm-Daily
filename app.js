@@ -56,7 +56,7 @@
     exceptions: {},
     filters: [],
     notified: {},
-    settings: { calendarMode: 'month' }
+    settings: { calendarMode: 'month', defaultReminderMinutes: -1 }
   });
 
   function course(title, date, startTime, endTime, location, weekday){
@@ -89,7 +89,7 @@
     const validFields = e => typeof e.title === 'string' && !!e.title.trim() && ids.has(e.categoryId) &&
       validDate(e.date) && validTime(e.startTime) && validTime(e.endTime) && e.endTime > e.startTime &&
       (e.location === undefined || typeof e.location === 'string') && (e.notes === undefined || typeof e.notes === 'string') &&
-      [-1,10,30,1440].includes(Number(e.reminderMinutes ?? -1));
+      validReminder(Number(e.reminderMinutes ?? -1));
     for(const e of data.events){
       if(!isObject(e) || !validId(e.id) || eventIds.has(e.id) || !validFields(e) ||
         (e.seriesStatus !== undefined && !validStatus(e.seriesStatus))) throw new Error('Jadwal backup tidak valid.');
@@ -115,7 +115,8 @@
     if(data.filters !== undefined && (!Array.isArray(data.filters) || data.filters.some(id=>!ids.has(id)))) throw new Error('Filter tidak valid.');
     if(data.notified !== undefined && (!isObject(data.notified) || Object.values(data.notified).some(v=>!Number.isFinite(v)))) throw new Error('Pengingat tidak valid.');
     if(data.settings !== undefined && (!isObject(data.settings) || (data.settings.calendarMode && !['day','week','month'].includes(data.settings.calendarMode)))) throw new Error('Pengaturan tidak valid.');
-    return {...data,version:1,initialized:true,exceptions:data.exceptions || {},filters:data.filters || [],notified:data.notified || {},settings:{calendarMode:'month',...(data.settings || {})}};
+    if(data.settings?.defaultReminderMinutes !== undefined && !validReminder(data.settings.defaultReminderMinutes)) throw new Error('Pengingat bawaan tidak valid.');
+    return {...data,version:1,initialized:true,exceptions:data.exceptions || {},filters:data.filters || [],notified:data.notified || {},settings:{calendarMode:'month',defaultReminderMinutes:-1,...(data.settings || {})}};
   }
   function loadState(){
     try {
@@ -332,7 +333,7 @@
   function eventCardHtml(o){
     const cat=categoryById(o.categoryId);
     const status=o.status==='done'?'<span class="status-pill done">✓ Selesai</span>':o.status==='cancelled'?'<span class="status-pill cancelled">Dibatalkan</span>':'';
-    return `<article class="event-card" data-event-id="${o.eventId}" data-date="${o.date}"><div class="event-bar" style="background:${cat.color}"></div><div class="event-main"><div class="event-time">${timeRange(o)} • ${escapeHtml(cat.name)}</div><p class="event-title">${escapeHtml(o.title)}</p>${o.location?`<p class="event-detail">⌖ ${escapeHtml(o.location)}</p>`:''}${status}</div><div class="event-actions"><button class="more-btn" aria-label="Aksi kegiatan">•••</button></div></article>`;
+    return `<article class="event-card" data-event-id="${o.eventId}" data-date="${o.date}"><div class="event-bar" style="background:${cat.color}"></div><div class="event-main"><div class="event-time">${timeRange(o)} • ${escapeHtml(cat.name)}</div><p class="event-title">${escapeHtml(o.title)}</p>${o.location?`<p class="event-detail">⌖ ${escapeHtml(o.location)}</p>`:''}<p class="event-detail">${escapeHtml(o.date)} · ${escapeHtml(reminderLabel(o.reminderMinutes))}</p>${status || '<span class="status-pill scheduled">Terjadwal</span>'}</div><div class="event-actions"><button class="more-btn" aria-label="Aksi kegiatan">Aksi ⋯</button></div></article>`;
   }
 
   function emptyStateHtml(title,desc){ return `<div class="empty-state"><div class="empty-icon">◷</div><h3>${escapeHtml(title)}</h3><p class="muted">${escapeHtml(desc)}</p><button class="primary-btn inline-add" style="margin-top:12px">＋ Buat jadwal</button></div>`; }
@@ -349,7 +350,50 @@
     $('calendarCanvas').querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>{selectedDate=parseLocalDate(b.dataset.date);calendarCursor=new Date(selectedDate);renderCalendar();});
   }
 
+  function validReminder(minutes){ return Number.isInteger(minutes) && (minutes===-1 || (minutes>=0 && minutes<=40320)); }
+  function reminderLabel(minutes){
+    if(minutes<0)return 'Tidak ada pengingat';
+    if(minutes===0)return 'Saat kegiatan dimulai';
+    if(minutes%1440===0)return `${minutes/1440} hari sebelum`;
+    if(minutes%60===0)return `${minutes/60} jam sebelum`;
+    return `${minutes} menit sebelum`;
+  }
+  function setReminderFields(prefix,minutes){
+    const custom=![-1,5,10,30,1440].includes(minutes);
+    $(prefix+'Reminder').value=custom?'custom':String(minutes);
+    let unit=1;
+    if(minutes>0 && minutes%1440===0)unit=1440;
+    else if(minutes>0 && minutes%60===0)unit=60;
+    $(prefix+'ReminderAmount').value=String(custom?minutes/unit:5);
+    $(prefix+'ReminderUnit').value=String(unit);
+    updateReminderFields(prefix);
+  }
+  function updateReminderFields(prefix){
+    const custom=$(prefix+'Reminder').value==='custom';
+    $(prefix+'ReminderCustom').classList.toggle('hidden',!custom);
+    $(prefix+'ReminderAmount').required=custom;
+    $(prefix+'ReminderAmount').disabled=!custom;
+    $(prefix+'ReminderUnit').disabled=!custom;
+  }
+  function readReminderFields(prefix){
+    if($(prefix+'Reminder').value!=='custom')return Number($(prefix+'Reminder').value);
+    const amount=Number($(prefix+'ReminderAmount').value),unit=Number($(prefix+'ReminderUnit').value);
+    return $(prefix+'ReminderAmount').value.trim()!=='' && Number.isInteger(amount) && amount>=0 && [1,60,1440].includes(unit)?amount*unit:NaN;
+  }
+  function setupReminderSettings(){
+    for(const prefix of ['event','default'])$(prefix+'Reminder').onchange=()=>updateReminderFields(prefix);
+    $('saveDefaultReminderBtn').onclick=()=>{
+      const minutes=readReminderFields('default');
+      if(!validReminder(minutes)){toast('Isi angka bulat antara 0 dan 4 minggu sebelum kegiatan (maksimal 40.320 menit).');return;}
+      try{state.settings.defaultReminderMinutes=minutes;saveState();renderSettings();toast('Pengingat bawaan disimpan. Jadwal lama tetap sama.');}
+      catch(error){handleStorageError(error);}
+    };
+    $('calendarSettingsBtn').onclick=()=>document.querySelector('[data-page="settingsPage"]').click();
+  }
+
   function renderSettings(){
+    setReminderFields('default',state.settings.defaultReminderMinutes ?? -1);
+    $('defaultReminderSummary').textContent='Untuk jadwal baru: '+reminderLabel(state.settings.defaultReminderMinutes ?? -1)+'.';
     $('categoryList').innerHTML=state.categories.map(c=>`<div class="category-row"><div class="category-ident"><span class="category-swatch" style="background:${c.color}"></span><strong>${escapeHtml(c.name)}</strong></div>${c.builtin?'':'<button class="text-btn" data-delete-category="'+c.id+'">Hapus</button>'}</div>`).join('');
     $('categoryList').querySelectorAll('[data-delete-category]').forEach(b=>b.onclick=()=>deleteCategory(b.dataset.deleteCategory));
   }
@@ -363,7 +407,7 @@
   function openNewEvent(dk=dateKey(new Date())){
     editingContext=null; $('eventDialogTitle').textContent='Tambah Jadwal';
     $('eventForm').reset(); populateCategorySelect();
-    $('eventCategory').value=state.categories[0]?.id || 'pribadi'; $('eventReminder').value='-1'; $('eventDate').value=dk;
+    $('eventCategory').value=state.categories[0]?.id || 'pribadi'; setReminderFields('event',state.settings.defaultReminderMinutes ?? -1); $('eventDate').value=dk;
     $('eventStartTime').value='09:00'; $('eventEndTime').value='10:00'; $('eventRecurrence').value='none';
     $('eventRecurrence').disabled=false; clearWeekdayPicker(); updateRecurrenceFields(); $('eventDialog').showModal();
   }
@@ -379,7 +423,7 @@
     const ev=state.events.find(e=>e.id===eventId); const o=ev&&occurrenceFor(ev,parseLocalDate(dk)); if(!ev||!o)return;
     if(scope==='all') Object.assign(o,{...ev,date:ev.date});
     editingContext={eventId, date:dk, scope}; $('eventDialogTitle').textContent=scope==='one'?'Ubah Kejadian':'Ubah Jadwal'; populateCategorySelect();
-    $('eventTitle').value=o.title; $('eventCategory').value=o.categoryId; $('eventReminder').value=String(o.reminderMinutes ?? -1);
+    $('eventTitle').value=o.title; $('eventCategory').value=o.categoryId; setReminderFields('event',Number(o.reminderMinutes ?? -1));
     $('eventDate').value=o.date; $('eventStartTime').value=o.startTime; $('eventEndTime').value=o.endTime; $('eventLocation').value=o.location||''; $('eventNotes').value=o.notes||'';
     if(scope==='one'){ $('eventRecurrence').value='none'; $('eventRecurrence').disabled=true; $('eventUntil').value=''; }
     else { $('eventRecurrence').disabled=false; $('eventRecurrence').value=ev.recurrence?.type||'none'; $('eventUntil').value=ev.recurrence?.until||''; setWeekdayPicker(ev.recurrence?.weekdays||[]); }
@@ -392,11 +436,12 @@
     return {
       title:$('eventTitle').value.trim(), categoryId:$('eventCategory').value, date:$('eventDate').value,
       startTime:$('eventStartTime').value, endTime:$('eventEndTime').value, location:$('eventLocation').value.trim(), notes:$('eventNotes').value.trim(),
-      reminderMinutes:Number($('eventReminder').value), recurrence:{type,weekdays,until:type==='none'?null:($('eventUntil').value||null)}
+      reminderMinutes:readReminderFields('event'), recurrence:{type,weekdays,until:type==='none'?null:($('eventUntil').value||null)}
     };
   }
 
   function validateForm(data){
+    if(!validReminder(data.reminderMinutes))return 'Pengingat harus berupa angka bulat antara 0 dan 4 minggu sebelum kegiatan (maksimal 40.320 menit).';
     if(!data.title||!data.date||!data.startTime||!data.endTime) return 'Lengkapi judul, tanggal, dan waktu.';
     if(withTime(data.date,data.endTime)<=withTime(data.date,data.startTime)) return 'Jam selesai harus setelah jam mulai.';
     if(data.recurrence.type==='custom'&&!data.recurrence.weekdays.length) return 'Pilih minimal satu hari untuk jadwal berulang.';
@@ -539,15 +584,16 @@
     if(!('Notification' in window)||Notification.permission!=='granted')return;
     checkingReminders=true;
     try {
-    const now=new Date(); const start=addDays(now,-1), end=addDays(now,2);
+    const now=new Date(); const start=addDays(now,-1), end=addDays(now,29);
     const list=occurrencesBetween(start,end,{filters:[]}).filter(o=>o.status==='scheduled' && o.reminderMinutes>=0);
     let dirty=false;
     for(const o of list){
       const remindAt=new Date(o.startDateTime.getTime()-o.reminderMinutes*60000);
       const key=`${o.eventId}|${o.date}|${o.startTime}|${o.reminderMinutes}`;
-      if(now>=remindAt && now<o.startDateTime && !state.notified[key]){ if(await notifyOccurrence(o)){state.notified[key]=Date.now(); dirty=true;} }
+      const deadline=o.reminderMinutes===0?new Date(o.startDateTime.getTime()+60000):o.startDateTime;
+      if(now>=remindAt && now<deadline && !state.notified[key]){ if(await notifyOccurrence(o)){state.notified[key]=Date.now(); dirty=true;} }
     }
-    const cutoff=Date.now()-14*86400000;
+    const cutoff=Date.now()-30*86400000;
     for(const [k,v] of Object.entries(state.notified)) if(v<cutoff){delete state.notified[k];dirty=true;}
     if(dirty)saveState();
     } finally {checkingReminders=false;}
@@ -674,7 +720,7 @@
   function updateAppStatus(){
     document.documentElement.classList.toggle('standalone',isStandalone());
     $('installHint').classList.toggle('hidden',!isIOS() || isStandalone());
-    $('appStatus').textContent=`v1.3.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
+    $('appStatus').textContent=`v1.4.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
   }
   async function registerSW(){
     if(!('serviceWorker' in navigator) || !window.isSecureContext){updateAppStatus();return;}
@@ -736,12 +782,20 @@
     const render=status=>{
       $('googleSyncStatus').textContent=status.message;
       $('googleSyncStatus').classList.toggle('sync-error',status.error);
-      $('googleSyncBanner').classList.toggle('hidden',!status.enabled);
-      $('googleSyncBanner').textContent=status.message;
+      const connected=status.connected || (status.enabled && backend?.hasSession);
+      const label=status.error?'Sinkron gagal':status.running?'Sedang menyinkronkan':connected && status.lastSync && !status.pending?'Sinkron selesai':connected?'Terhubung':'Belum terhubung';
+      const icon=status.error?'!':status.running?'↻':connected?'✓':'○';
+      $('googleStatusBadge').textContent=icon+' '+label;
+      $('googleStatusBadge').classList.toggle('sync-error',status.error);
+      $('googleBannerLabel').textContent='Google Calendar · '+label;
+      $('googleSyncBanner').classList.toggle('sync-error',status.error);
+      $('googleErrorHelp').classList.toggle('hidden',!status.error);
+      $('googleConnectBtn').className=connected?'soft-btn':'primary-btn';
+      $('googleSyncBtn').className=connected?'primary-btn':'soft-btn';
       $('googleAccount').textContent=status.account?`Akun: ${status.account}`:'Google belum terhubung.';
       $('googleTarget').textContent=status.calendarId?`ID kalender tujuan: ${status.calendarId}`:'';
-      $('googleLastSync').textContent=status.lastSync?`Sinkron terakhir: ${status.lastSync}`:'';
-      $('googleConnectBtn').disabled=!loaded || !status.enabled || status.running || busy;
+      $('googleLastSync').textContent=status.lastSync?`Sinkron terakhir: ${status.lastSync}`:'Belum ada sinkronisasi berhasil.';
+      $('googleConnectBtn').disabled=status.running || busy;
       $('googleSyncBtn').disabled=!status.enabled || status.running || busy;
       $('googleDisconnectBtn').disabled=(!status.enabled && !backend?.hasSession) || status.running || busy;
       $('googlePrepareBtn').disabled=status.running || busy;
@@ -770,7 +824,9 @@
       // Open during the gesture, before the network await; manual link is a fallback.
       popup=window.open('about:blank','_blank');busy=true;googleSync.status();
       try{
-        saveState();const login=await backend.begin();
+        saveState();
+        if(!loaded || !googleSync.enabled){const server=await backend.prepare();googleSync.configure(server.clientId);$('googleClientId').value=server.clientId;loaded=true;}
+        const login=await backend.begin();
         $('googleAuthLink').href=login.url;$('googleAuthLink').classList.remove('hidden');
         if(popup)popup.location.href=login.url;
         googleSync.notice('Selesaikan izin di Google. Jika tidak kembali otomatis, salin kode koneksi dari halaman hasil ke bagian di bawah.');
@@ -815,11 +871,11 @@
     document.addEventListener('visibilitychange',()=>{if(!document.hidden && googleSync.enabled)googleSync.changed();});
     // Resume only an explicitly enabled integration with an existing device session.
     try{if(googleSync.enabled && backend.hasSession)googleSync.sync();
-      else googleSync.notice('Tekan Siapkan Koneksi Google untuk mengaktifkan perpanjangan akses otomatis.');
+      else googleSync.notice('Tekan Hubungkan Google untuk menyinkronkan jadwal Anda.');
     }catch(error){showError(error);}
   }
 
 
-  setupEvents(); setupPlatform(); setupGoogleSync(); renderAll(); registerSW(); checkReminders(); setInterval(checkReminders,30000);
+  setupReminderSettings(); setupEvents(); setupPlatform(); setupGoogleSync(); renderAll(); registerSW(); checkReminders(); setInterval(checkReminders,30000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){renderToday();checkReminders();}});
 })();

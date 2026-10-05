@@ -56,6 +56,27 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name)}
  await test('Automatic local change creates updated event before deleting obsolete copy',async()=>{const f=fixture();await f.connect();f.calls.length=0;f.state.events[0].title='Rapat baru';f.controller.changed();await f.flush();assert.equal(f.active().length,1);assert.equal(f.active()[0].summary,'Rapat baru');const post=f.calls.findIndex(c=>c.method==='POST'),del=f.calls.findIndex(c=>c.method==='DELETE');assert(post>=0 && del>post)});
  await test('Repeated unchanged sync does not duplicate; delete removes app event',async()=>{const f=fixture();await f.connect();await f.controller.sync();assert.equal(f.active().length,1);f.state.events=[];await f.controller.sync();assert.equal(f.active().length,0)});
  await test('Reminder choices 10,30,1440 and done/no-reminder mapping',()=>{const f=fixture();for(const minutes of [10,30,1440]){f.state.events[0].reminderMinutes=minutes;assert.equal(f.plan()[0].body.reminders.overrides[0].minutes,minutes)}f.state.events[0].seriesStatus='done';assert.equal(f.plan()[0].body.reminders.overrides.length,0);assert(f.plan()[0].body.summary.startsWith('✓ '));f.state.events[0].seriesStatus='cancelled';assert.equal(f.plan().length,0)});
+ await test('5-minute/custom reminder updates preserve Google event id without POST or DELETE',async()=>{
+  const f=fixture();await f.connect();const id=f.active()[0].id;
+  for(const minutes of [5,90,40320,0,-1]){
+    f.calls.length=0;f.state.events[0].reminderMinutes=minutes;await f.controller.sync();
+    assert.equal(f.active().length,1);assert.equal(f.active()[0].id,id);
+    assert.equal(f.calls.filter(c=>c.method==='POST' || c.method==='DELETE').length,0);
+    assert.equal(f.active()[0].reminders.overrides.length,minutes<0?0:1);
+    if(minutes>=0)assert.equal(f.active()[0].reminders.overrides[0].minutes,minutes);
+  }
+ });
+ await test('Google normalized dateTimes and omitted empty fields still update same reminder event',async()=>{
+  const f=fixture();f.state.events[0].location='';await f.connect();const prior=f.active()[0],id=prior.id;
+  prior.start.dateTime=new Date(prior.start.dateTime).toISOString().replace('.000Z','+00:00');prior.end.dateTime=new Date(prior.end.dateTime).toISOString().replace('.000Z','+00:00');delete prior.location;delete prior.transparency;
+  f.calls.length=0;f.state.events[0].reminderMinutes=5;await f.controller.sync();assert.equal(f.active()[0].id,id);assert(!f.calls.some(c=>c.method==='POST' || c.method==='DELETE'));
+ });
+ await test('Lost reminder PUT response retries same event; last successful sync survives reload',async()=>{
+  const f=fixture();await f.connect();const id=f.active()[0].id;f.state.events[0].reminderMinutes=5;let lost=true;
+  f.hook=({method,body})=>{if(method==='PUT' && lost){lost=false;f.events.values().next().value.set(id,{...body,id,status:'confirmed'});throw Error('lost PUT response')}};
+  await f.controller.sync();f.hook=null;await f.controller.sync();assert.equal(f.active().length,1);assert.equal(f.active()[0].id,id);assert.equal(f.active()[0].reminders.overrides[0].minutes,5);
+  const raw=f.values.get(key),g=fixture({raw});g.controller.status();assert(g.statuses.at(-1).lastSync);assert(!raw.includes('TEST_ONLY_TOKEN'));
+ });
  await test('Daily/weekly/custom RRULE, UNTIL, EXDATE and modified instance',()=>{const f=fixture();const e=f.state.events[0];e.recurrence={type:'daily',until:'2026-10-20'};assert(f.plan()[0].body.recurrence[0].startsWith('RRULE:FREQ=DAILY;UNTIL='));e.recurrence={type:'weekly'};assert.equal(f.plan()[0].body.recurrence[0],'RRULE:FREQ=WEEKLY;BYDAY=MO');e.recurrence={type:'custom',weekdays:[2,4]};assert.equal(f.plan()[0].body.recurrence[0],'RRULE:FREQ=WEEKLY;BYDAY=TU,TH');assert(f.plan()[0].body.start.dateTime.includes('2026-10-06'));f.state.exceptions['event1|2026-10-06']={overrides:{title:'Kejadian khusus',startTime:'11:00',endTime:'12:00'}};const plan=f.plan();assert.equal(plan.length,2);assert.equal(plan[0].body.summary,'Kejadian khusus');assert(plan[1].body.recurrence.some(r=>r.startsWith('EXDATE:')));f.state.exceptions['event1|2026-10-06']={deleted:true};assert.equal(f.plan().length,1)});
  await test('Cancelled series preserves explicitly reactivated occurrence',()=>{const f=fixture();f.state.events[0].seriesStatus='cancelled';f.state.events[0].recurrence={type:'daily'};f.state.exceptions['event1|2026-10-06']={status:'scheduled'};const plan=f.plan();assert.equal(plan.length,1);assert.equal(plan[0].key,'event1|2026-10-06')});
  await test('Offline saves defer network work, expiry requires new user authorization',async()=>{const f=fixture();await f.connect();f.calls.length=0;f.ctx.navigator.onLine=false;f.state.events[0].title='Offline edit';await f.controller.sync();assert.equal(f.calls.length,0);f.ctx.navigator.onLine=true;await f.controller.sync();assert.equal(f.active()[0].summary,'Offline edit');f.calls.length=0;f.now+=3600000;await f.controller.sync();assert.equal(f.calls.length,0);assert(!f.statuses.at(-1).connected)});
