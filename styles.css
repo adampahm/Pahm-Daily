@@ -308,3 +308,5 @@ input,select,textarea { max-width:100%; min-width:0; font-size:16px; }
 .hidden{display:none!important}
 
 .time-parts{display:flex;align-items:center;gap:6px}.time-parts input{min-width:0;width:calc(50% - 10px);text-align:center;padding:12px 4px;font-variant-numeric:tabular-nums}.time-parts>span{font-weight:700}.more-btn{min-width:44px;min-height:44px;padding:8px;font-size:24px}#timeFieldMessage{margin-top:0;color:var(--danger)}
+
+.filter-notice{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--accent-soft);padding:10px 12px;border-radius:12px;margin-bottom:12px;font-size:14px}.iphone-calendar-help ol{padding-left:22px}.iphone-calendar-help li{margin-bottom:10px}

@@ -50,6 +50,13 @@ function fixture(options={}){
 let passed=0;
 async function test(name,fn){await fn();passed++;console.log('PASS',name)}
 (async()=>{
+ await test('Multiple same/different-day schedules, recurring series, debounced edits and offline retry all use one calendar',async()=>{
+ const f=fixture();f.state.events=Array.from({length:7},(_,i)=>({...baseEvent(),id:'multi'+i,title:'Activity '+i,date:i<5?'2026-10-05':'2026-10-07'}));f.state.events[6].recurrence={type:'daily'};
+ await f.connect();assert.equal(f.active().length,7);assert.equal(f.calendars.size,1);assert.equal(f.statuses.at(-1).lastSyncedCount,7);
+ for(let i=0;i<5;i++){f.state.events[i].startTime='11:03';f.state.events[i].endTime='12:07';f.controller.changed();}assert.equal([...f.timers.values()].filter(t=>t.ms===600).length,1);await f.flush();assert.equal(f.active().length,7);assert.equal(f.calendars.size,1);
+ f.ctx.navigator.onLine=false;f.state.events.push({...baseEvent(),id:'offline-added'});f.controller.changed();await f.flush();assert.equal(f.active().length,7);f.ctx.navigator.onLine=true;f.controller.changed();await f.flush();assert.equal(f.active().length,8);await f.controller.sync();assert.equal(f.active().length,8);
+ const destinations=new Set(f.calls.filter(c=>c.url.includes('/events')).map(c=>new URL(c.url).pathname.split('/')[4]));assert.equal(destinations.size,1);
+ });
  await test('No Google requests or SDK load before opt-in',async()=>{const f=fixture();f.controller.changed();await f.flush();assert.equal(f.calls.length,0);assert(!f.controller.enabled);assert(f.ctx.window.FahmiGoogleCalendar.SCOPES.includes('calendar.app.created'))});
  await test('OAuth client ID validation and corrupt sync metadata fail closed',async()=>{const f=fixture();assert.throws(()=>f.controller.configure('client-secret'));const g=fixture({raw:'{bad'});assert.throws(()=>g.controller.configure(clientId));assert.equal(g.calls.length,0)});
  await test('Connect creates a dedicated calendar and event; token never persisted',async()=>{const f=fixture();await f.connect();assert.equal(f.calendars.size,1);assert.equal(f.active().length,1);assert.equal(f.active()[0].summary,'Rapat');assert.equal(f.active()[0].reminders.overrides[0].minutes,10);assert(![...f.values.values()].some(v=>v.includes('TEST_ONLY_TOKEN')));assert(f.statuses.at(-1).connected)});

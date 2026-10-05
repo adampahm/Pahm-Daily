@@ -13,7 +13,7 @@ function fixture(raw=null){
  const originalCheckReminders=checkReminders;
  renderAll=()=>{};renderCalendar=()=>{};populateCategorySelect=()=>{};updateRecurrenceFields=()=>{};clearWeekdayPicker=()=>{};setWeekdayPicker=()=>{};
  toast=()=>{};checkReminders=()=>{};chooseScope=async()=>globalThis.scope||'one';shareOrDownload=async f=>globalThis.files.push(f);
- globalThis.api={updateTimeParts,validReminder,readReminderFields,setReminderFields,validateForm,gatherForm,defaults,normalizeState,occursOn,occurrenceFor,occurrencesBetween,commitForm,deleteFlow,setStatusFlow,openNewEvent,openEditEvent,importBackup,exportBackup,calendarICS,foldICS,isStandalone,isIOS,saveState,candidateConflicts,checkReminders:originalCheckReminders,
+ globalThis.api={renderToday,renderDay,renderWeek,renderMonth,renderSelectedDayAgenda,resetScheduleFilters,updateTimeParts,validReminder,readReminderFields,setReminderFields,validateForm,gatherForm,defaults,normalizeState,occursOn,occurrenceFor,occurrencesBetween,commitForm,deleteFlow,setStatusFlow,openNewEvent,openEditEvent,importBackup,exportBackup,calendarICS,foldICS,isStandalone,isIOS,saveState,candidateConflicts,checkReminders:originalCheckReminders,
  get state(){return state},set state(v){state=v},set editing(v){editingContext=v},get blocked(){return storageBlocked}};
 })();`;
  ctx.files=files;vm.createContext(ctx);vm.runInContext(code,ctx);
@@ -21,6 +21,17 @@ function fixture(raw=null){
 }
 async function test(name,fn){await fn();results.push({name,status:'PASS'});console.log('PASS',name)}
 (async()=>{
+ await test('Five same-day schedules plus other dates survive reload and all calendar views; filters only hide data',()=>{
+ const f=fixture();f.api.state.events=[];f.api.state.exceptions={};const d=new Date();const day=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+ const data={title:'',categoryId:'pribadi',date:day,startTime:'08:00',endTime:'09:00',location:'',notes:'',reminderMinutes:-1,recurrence:{type:'none'}};
+ for(let i=0;i<5;i++)f.api.commitForm({...data,title:'Same day '+i,startTime:String(8+i).padStart(2,'0')+':03',endTime:String(9+i).padStart(2,'0')+':07'});
+ f.api.commitForm({...data,title:'Other date',date:'2027-01-20'});f.api.commitForm({...data,title:'Daily',recurrence:{type:'daily'}});
+ assert.equal(new Set(f.api.state.events.map(e=>e.id)).size,7);const g=fixture(f.data.get('fahmiDailyPWA.v1'));assert.equal(g.api.state.events.length,7);assert.equal(g.api.occurrencesBetween(d,d,{filters:[]}).length,6);
+ for(const html of [g.api.renderDay(d,''),g.api.renderWeek(d,d,''),g.api.renderMonth(d,d,'')])assert(html);
+ g.api.renderToday();assert.equal((g.el('todayList').innerHTML.match(/<article/g)||[]).length,6);
+ g.api.state.filters=['kuliah'];g.api.renderToday();assert(g.el('todayFilterNotice').innerHTML.includes('0 dari 6'));assert.equal(g.api.state.events.length,7);g.el('searchInput').value='no match';g.api.resetScheduleFilters();assert.equal(g.el('searchInput').value,'');assert.equal(g.api.state.filters.length,0);g.api.renderToday();assert.equal((g.el('todayList').innerHTML.match(/<article/g)||[]).length,6);
+ assert.equal(g.api.occurrencesBetween(d,d,{query:'Same day 2'}).length,1);assert.equal(g.api.occurrencesBetween(new Date(2027,0,20),new Date(2027,0,20),{filters:[]}).length,2);
+ });
  await test('Split time input uses +1h until manual edit, preserves legacy and rejects midnight rollover',()=>{
  const f=fixture();f.api.openNewEvent();assert.equal(f.el('eventEndTime').value,'10:00');
  f.el('eventStartHour').value='14';f.el('eventStartMinute').value='7';f.api.updateTimeParts('Start');assert.equal(f.el('eventStartTime').value,'14:07');assert.equal(f.el('eventEndTime').value,'15:07');

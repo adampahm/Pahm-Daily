@@ -1,6 +1,6 @@
 'use strict';
 // Increment VERSION for each release that changes the app shell.
-const VERSION = 'v1.8.0-time1';
+const VERSION = 'v1.9.0-calendar1';
 const PREFIX = `fahmi-daily:${self.registration.scope}:`;
 const CACHE = PREFIX + VERSION;
 const ASSETS = ['index.html','styles.css','app.js','google-config.js','google-calendar.js','google-server.js','weather.js','weather-ui.js','manifest.webmanifest',

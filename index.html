@@ -37,6 +37,7 @@
             <p id="todayDateLabel" class="muted"></p>
           </div>
         </div>
+        <div id="todayFilterNotice" class="filter-notice hidden"></div>
         <div id="todayList" class="stack"></div><div id="statistics" class="info-card" aria-label="Statistik minggu ini"></div>
       </section>
 
@@ -120,8 +121,9 @@
           <h2>Google Calendar</h2>
           <p id="googleStatusBadge" class="sync-badge" role="status" aria-live="polite">○ Belum terhubung</p>
           <p id="googleAccount" class="account-line"></p>
-          <p id="googleLastSync" class="muted small"></p>
-          <details><summary>Lihat Detail Sinkron</summary><p>Sinkron otomatis saat aplikasi terbuka dan online.</p></details>
+          <p id="googleLastSync" class="muted small"></p><p id="googleSyncedCount" class="muted small"></p>
+          <details class="iphone-calendar-help"><summary>Jadwal belum lengkap di iPhone?</summary><p>Jika semua kegiatan muncul di Google Calendar, periksa kalender yang dipilih di iPhone.</p><ol><li>Pengaturan iPhone → App → Kalender → Akun Kalender: pilih akun Google yang sama dan aktifkan Kalender. Pada iOS lama, buka Pengaturan → Kalender → Akun.</li><li>Buka Kalender iPhone → Kalender di bagian bawah. Centang Fahmi Daily di bawah akun tersebut, lalu Selesai.</li><li>Periksa tanggal kegiatan. Jika ada beberapa Fahmi Daily, cocokkan ID kalender tujuan di Lihat Detail dengan Google Calendar → Setelan → Integrasikan kalender.</li></ol><p>Menu Ekspor kegiatan (.ics) hanya menyalin satu kejadian. Untuk semua kegiatan dan pembaruan otomatis, gunakan koneksi Google.</p><p><a href="https://support.google.com/calendar/answer/99358?co=GENIE.Platform%3DiOS&amp;hl=id" target="_blank" rel="noopener">Panduan Google</a> · <a href="https://support.apple.com/id-id/guide/iphone/iph3d1110d4/ios" target="_blank" rel="noopener">Panduan Apple</a></p></details>
+          <details><summary>Lihat Detail Sinkron</summary><p>Sinkron otomatis saat aplikasi terbuka dan online. Perubahan Google tidak diimpor ke aplikasi. Saat aplikasi ditutup, sinkron tidak dijamin berjalan.</p></details>
           <div class="sync-actions main-sync-actions">
             <button id="googleConnectBtn" class="primary-btn">Hubungkan Google</button>
             <button id="googleSyncBtn" class="soft-btn" disabled>Sinkronkan Sekarang</button>

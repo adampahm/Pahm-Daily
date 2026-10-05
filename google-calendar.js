@@ -89,7 +89,7 @@
       }
     } catch {storageError=true;}
     let accessToken='',expiresAt=0,account=null,epoch=0,running=false,again=false,pending=true,lastSync=config.lastSync || '',timer;
-    const emit = (message,error=false) => onStatus({message,error,enabled:config.enabled,connected:!!account && !!accessToken && clock()<expiresAt,account:account?.email || '',calendarId:account?config.accounts[account.sub]?.calendarId || '':'',running,pending,lastSync,clientId:config.clientId});
+    const emit = (message,error=false) => onStatus({message,error,enabled:config.enabled,connected:!!account && !!accessToken && clock()<expiresAt,account:account?.email || '',calendarId:account?config.accounts[account.sub]?.calendarId || '':'',running,pending,lastSync,lastSyncedCount:config.lastSyncedCount,clientId:config.clientId});
     function persist(){
       if(storageError)throw new Error('Konfigurasi sinkron tidak dapat dibaca. Jadwal lokal aman; hubungi bantuan sebelum mengganti konfigurasi.');
       const current=storage.getItem(KEY);
@@ -237,7 +237,7 @@
             catch(error){if(error.status!==404 && error.status!==410)throw error;}
           }
         }
-        pending=false;lastSync=new Date(clock()).toLocaleString('id-ID');config.lastSync=lastSync;persist();emit(`Sinkron selesai: ${plan.length} event/rangkaian. Kalender iPhone akan mengikuti pembaruan akun Google.`);
+        pending=false;lastSync=new Date(clock()).toLocaleString('id-ID');config.lastSync=lastSync;config.lastSyncedCount=plan.length;persist();emit(`Sinkron selesai: ${plan.length} acara/rangkaian ke Google. Jika belum lengkap di iPhone, periksa akun dan kalender yang dipilih.`);
       } catch(error){emit(error.message,true);}
       finally {running=false;emitStatus();if(again && authorized())queue();}
     }

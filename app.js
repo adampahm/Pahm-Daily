@@ -265,9 +265,13 @@
       $('todayHero').innerHTML=`<div class="hero-card hero-empty"><p class="hero-kicker">Agenda</p><p class="hero-title">Belum ada kegiatan berikutnya</p><p class="hero-meta">Tambahkan jadwal agar harimu lebih teratur.</p></div>`;
     }
     const list=todayOccurrences();
+    const all=occurrencesBetween(now,now,{filters:[]});
+    $('todayFilterNotice').classList.toggle('hidden',!state.filters.length);
+    $('todayFilterNotice').innerHTML=state.filters.length?`<span>Filter aktif · ${list.length} dari ${all.length} kegiatan</span><button class="text-btn" id="resetTodayFilters">Reset Filter</button>`:'';
+    if(state.filters.length)$('resetTodayFilters').onclick=resetScheduleFilters;
     const week=occurrencesBetween(startOfWeek(now),endOfWeek(now),{filters:[]});
     $('statistics').textContent=`Minggu ini: ${week.length} kegiatan • ${week.filter(o=>o.status==='done').length} selesai • ${week.filter(o=>o.status==='cancelled').length} dibatalkan (semua kategori).`;
-    $('todayList').innerHTML=list.length?list.map(eventCardHtml).join(''):emptyStateHtml('Tidak ada kegiatan hari ini','Gunakan tombol tambah untuk membuat jadwal.');
+    $('todayList').innerHTML=list.length?list.map(eventCardHtml).join(''):emptyStateHtml(all.length?'Kegiatan tersembunyi oleh filter':'Tidak ada kegiatan hari ini',all.length?'Tekan Reset Filter untuk menampilkan kegiatan.':'Gunakan tombol tambah untuk membuat jadwal.');
     bindEventCards($('todayList'));
   }
 
@@ -332,9 +336,12 @@
     bindEventCards($('calendarAgenda'));
   }
 
+  function resetScheduleFilters(){state.filters=[];$('searchInput').value='';saveState();renderAll();}
   function renderActiveFilters(){
-    $('activeFilters').innerHTML=state.filters.map(id=>{const c=categoryById(id);return `<button class="chip" data-remove-filter="${id}"><span style="color:${c.color}">●</span> ${escapeHtml(c.name)} ×</button>`}).join('');
-    $('activeFilters').querySelectorAll('[data-remove-filter]').forEach(b=>b.onclick=()=>{state.filters=state.filters.filter(x=>x!==b.dataset.removeFilter);saveState();renderCalendar();});
+    const query=$('searchInput').value.trim();
+    $('activeFilters').innerHTML=(state.filters.length || query?'<span class="muted small">Filter aktif</span><button class="chip" id="resetScheduleFilters">Reset Filter</button>':'')+(query?'<span class="chip">Cari: '+escapeHtml(query)+'</span>':'')+state.filters.map(id=>{const c=categoryById(id);return `<button class="chip" data-remove-filter="${id}"><span style="color:${c.color}">●</span> ${escapeHtml(c.name)} ×</button>`}).join('');
+    if(state.filters.length || query)$('resetScheduleFilters').onclick=resetScheduleFilters;
+    $('activeFilters').querySelectorAll('[data-remove-filter]').forEach(b=>b.onclick=()=>{state.filters=state.filters.filter(x=>x!==b.dataset.removeFilter);saveState();renderAll();});
   }
 
   function eventCardHtml(o){
@@ -538,13 +545,13 @@
         state.exceptions[key]={...existing,...(cancel?{status:'cancelled'}:{}),overrides:{title:data.title,categoryId:data.categoryId,date:data.date,startTime:data.startTime,endTime:data.endTime,location:data.location,notes:data.notes,reminderMinutes:data.reminderMinutes,activityType:data.activityType || 'indoor',weatherLocation:data.weatherLocation || null,weatherAccepted:data.weatherAccepted || ''}};
       }
     }
-    saveState(); $('eventDialog').close(); editingContext=null; renderAll(); checkReminders(); toast(cancel?'Kegiatan dibatalkan':'Jadwal disimpan');
+    saveState(); $('eventDialog').close(); editingContext=null; selectedDate=parseLocalDate(data.date);calendarCursor=new Date(selectedDate); renderAll(); checkReminders(); toast(cancel?'Kegiatan dibatalkan':'Jadwal disimpan');
   }
 
   function openActionSheet(eventId,dk){
     const ev=state.events.find(e=>e.id===eventId); const o=ev&&occurrenceFor(ev,parseLocalDate(dk)); if(!o)return;
     const dlg=document.createElement('dialog'); dlg.className='center-dialog';
-    dlg.innerHTML=`<div class="modal-card action-sheet"><h2>${escapeHtml(o.title)}</h2><button class="action-btn" data-a="calendar">Tambahkan ke Kalender</button><p class="muted small">Ekspor kejadian ini saja. Kalender tidak otomatis mengikuti perubahan Fahmi Daily.</p><button class="action-btn" data-a="edit">Ubah jadwal</button><button class="action-btn" data-a="done">${o.status==='done'?'Tandai belum selesai':'Tandai selesai'}</button><button class="action-btn" data-a="cancel">${o.status==='cancelled'?'Aktifkan kembali':'Batalkan kegiatan'}</button><button class="action-btn danger" data-a="delete">Hapus jadwal</button><button class="text-btn" data-a="close">Tutup</button></div>`;
+    dlg.innerHTML=`<div class="modal-card action-sheet"><h2>${escapeHtml(o.title)}</h2><button class="action-btn" data-a="calendar">Ekspor kegiatan (.ics)</button><p class="muted small">Ekspor kejadian ini saja. Kalender tidak otomatis mengikuti perubahan Fahmi Daily.</p><button class="action-btn" data-a="edit">Ubah jadwal</button><button class="action-btn" data-a="done">${o.status==='done'?'Tandai belum selesai':'Tandai selesai'}</button><button class="action-btn" data-a="cancel">${o.status==='cancelled'?'Aktifkan kembali':'Batalkan kegiatan'}</button><button class="action-btn danger" data-a="delete">Hapus jadwal</button><button class="text-btn" data-a="close">Tutup</button></div>`;
     document.body.appendChild(dlg); dlg.showModal();
     dlg.addEventListener('close',()=>dlg.remove());
     dlg.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{
@@ -602,7 +609,7 @@
 
   function renderFilterOptions(){
     $('filterOptions').innerHTML=state.categories.map(c=>`<label class="filter-option"><span class="filter-left"><span class="category-swatch" style="background:${c.color}"></span>${escapeHtml(c.name)}</span><input type="checkbox" value="${c.id}" ${state.filters.includes(c.id)?'checked':''}></label>`).join('');
-    $('filterOptions').querySelectorAll('input').forEach(i=>i.onchange=()=>{if(i.checked&&!state.filters.includes(i.value))state.filters.push(i.value);else if(!i.checked)state.filters=state.filters.filter(x=>x!==i.value);saveState();renderCalendar();});
+    $('filterOptions').querySelectorAll('input').forEach(i=>i.onchange=()=>{if(i.checked&&!state.filters.includes(i.value))state.filters.push(i.value);else if(!i.checked)state.filters=state.filters.filter(x=>x!==i.value);saveState();renderAll();});
   }
 
   function deleteCategory(id){
@@ -760,13 +767,13 @@
     $('scopeCancelBtn').onclick=()=>{$('scopeDialog').close();scopeResolver?.(null);scopeResolver=null;};
     $('conflictBackBtn').onclick=()=>{$('conflictDialog').close();pendingSave=null;};
     $('conflictSaveBtn').onclick=()=>{$('conflictDialog').close();const fn=pendingSave;pendingSave=null;fn?.();};
-    $('calendarMode').querySelectorAll('button').forEach(b=>b.onclick=()=>{calendarMode=b.dataset.mode;state.settings.calendarMode=calendarMode;saveState();renderCalendar();});
+    $('calendarMode').querySelectorAll('button').forEach(b=>b.onclick=()=>{calendarMode=b.dataset.mode;state.settings.calendarMode=calendarMode;saveState();renderAll();});
     $('prevPeriodBtn').onclick=()=>shiftCalendar(-1); $('nextPeriodBtn').onclick=()=>shiftCalendar(1);
     $('todayNavBtn').onclick=()=>{calendarCursor=new Date();calendarCursor.setHours(12,0,0,0);selectedDate=new Date(calendarCursor);renderCalendar();};
     $('searchInput').oninput=()=>renderCalendar();
     $('filterBtn').onclick=()=>{renderFilterOptions();$('filterDialog').showModal();};
     $('filterCloseBtn').onclick=()=>$('filterDialog').close();
-    $('filterResetBtn').onclick=()=>{state.filters=[];saveState();renderFilterOptions();renderCalendar();};
+    $('filterResetBtn').onclick=()=>{state.filters=[];saveState();renderFilterOptions();renderAll();};
     $('notificationBtn').onclick=requestNotifications;
     $('addCategoryBtn').onclick=()=>{$('categoryForm').reset();$('categoryColor').value='#5B7CFA';$('categoryDialog').showModal();};
     $('categoryCancelBtn').onclick=()=>$('categoryDialog').close();
@@ -783,7 +790,7 @@
   let offlineReady=false;
   function updateAppStatus(){
     document.documentElement.classList.toggle('standalone',isStandalone());
-    $('appStatus').textContent=`v1.8.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
+    $('appStatus').textContent=`v1.9.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
   }
   async function registerSW(){
     if(!('serviceWorker' in navigator) || !window.isSecureContext){updateAppStatus();return;}
@@ -858,6 +865,7 @@
       $('googleSyncBtn').className=connected?'primary-btn':'soft-btn';
       $('googleAccount').textContent=status.account?`Akun: ${status.account}`:'Google belum terhubung.';
       $('googleTarget').textContent=status.calendarId?`ID kalender tujuan: ${status.calendarId}`:'';
+      $('googleSyncedCount').textContent=Number.isInteger(status.lastSyncedCount)?`Terakhir dikirim: ${status.lastSyncedCount} acara/rangkaian ke Google.`:'';
       $('googleLastSync').textContent=status.lastSync?`Sinkron terakhir: ${status.lastSync}`:'Belum ada sinkronisasi berhasil.';
       $('googleConnectBtn').disabled=status.running || busy;
       $('googleSyncBtn').disabled=!status.enabled || status.running || busy;
@@ -941,5 +949,5 @@
 
 
   setupWeather(); setupReminderSettings(); setupEvents(); setupPlatform(); setupGoogleSync(); renderAll(); registerSW(); weatherUI?.refresh(); checkReminders(); setInterval(checkReminders,30000);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden){renderToday();checkReminders();}});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){renderToday();renderCalendar();checkReminders();if(googleSync?.enabled && navigator.onLine)googleSync.changed();}});
 })();
