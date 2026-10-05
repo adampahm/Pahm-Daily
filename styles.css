@@ -306,3 +306,5 @@ input,select,textarea { max-width:100%; min-width:0; font-size:16px; }
 .settings-group{box-shadow:none}
 #googleSyncBanner{font-size:14px}
 .hidden{display:none!important}
+
+.time-parts{display:flex;align-items:center;gap:6px}.time-parts input{min-width:0;width:calc(50% - 10px);text-align:center;padding:12px 4px;font-variant-numeric:tabular-nums}.time-parts>span{font-weight:700}.more-btn{min-width:44px;min-height:44px;padding:8px;font-size:24px}#timeFieldMessage{margin-top:0;color:var(--danger)}

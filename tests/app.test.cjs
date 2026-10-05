@@ -13,7 +13,7 @@ function fixture(raw=null){
  const originalCheckReminders=checkReminders;
  renderAll=()=>{};renderCalendar=()=>{};populateCategorySelect=()=>{};updateRecurrenceFields=()=>{};clearWeekdayPicker=()=>{};setWeekdayPicker=()=>{};
  toast=()=>{};checkReminders=()=>{};chooseScope=async()=>globalThis.scope||'one';shareOrDownload=async f=>globalThis.files.push(f);
- globalThis.api={validReminder,readReminderFields,setReminderFields,validateForm,gatherForm,defaults,normalizeState,occursOn,occurrenceFor,occurrencesBetween,commitForm,deleteFlow,setStatusFlow,openNewEvent,openEditEvent,importBackup,exportBackup,calendarICS,foldICS,isStandalone,isIOS,saveState,candidateConflicts,checkReminders:originalCheckReminders,
+ globalThis.api={updateTimeParts,validReminder,readReminderFields,setReminderFields,validateForm,gatherForm,defaults,normalizeState,occursOn,occurrenceFor,occurrencesBetween,commitForm,deleteFlow,setStatusFlow,openNewEvent,openEditEvent,importBackup,exportBackup,calendarICS,foldICS,isStandalone,isIOS,saveState,candidateConflicts,checkReminders:originalCheckReminders,
  get state(){return state},set state(v){state=v},set editing(v){editingContext=v},get blocked(){return storageBlocked}};
 })();`;
  ctx.files=files;vm.createContext(ctx);vm.runInContext(code,ctx);
@@ -21,7 +21,16 @@ function fixture(raw=null){
 }
 async function test(name,fn){await fn();results.push({name,status:'PASS'});console.log('PASS',name)}
 (async()=>{
- await test('Five-minute picker preserves exact legacy times and new forms remove legacy options',()=>{const f=fixture();f.api.openNewEvent();assert.equal((f.el('eventStartTime').innerHTML.match(/<option/g)||[]).length,288);assert(!f.el('eventStartTime').innerHTML.includes('value="09:03"'));const e=f.api.state.events[0];e.startTime='09:03';e.endTime='10:07';f.api.openEditEvent(e.id,e.date,'all');assert.equal(f.el('eventStartTime').value,'09:03');assert.equal(f.el('eventEndTime').value,'10:07');assert(f.el('eventStartTime').innerHTML.includes('value="09:03"'));assert(f.el('eventEndTime').innerHTML.includes('value="10:07"'));const data=f.api.gatherForm();assert.equal(data.startTime,'09:03');assert.equal(data.endTime,'10:07');f.api.openNewEvent();assert(!f.el('eventStartTime').innerHTML.includes('value="09:03"'));});
+ await test('Split time input uses +1h until manual edit, preserves legacy and rejects midnight rollover',()=>{
+ const f=fixture();f.api.openNewEvent();assert.equal(f.el('eventEndTime').value,'10:00');
+ f.el('eventStartHour').value='14';f.el('eventStartMinute').value='7';f.api.updateTimeParts('Start');assert.equal(f.el('eventStartTime').value,'14:07');assert.equal(f.el('eventEndTime').value,'15:07');
+ f.el('eventEndHour').value='16';f.el('eventEndMinute').value='12';f.api.updateTimeParts('End');f.el('eventStartHour').value='15';f.api.updateTimeParts('Start');assert.equal(f.el('eventEndTime').value,'16:12');
+ f.el('eventStartHour').value='17';f.api.updateTimeParts('Start');assert.equal(f.el('eventEndTime').value,'16:12');assert.equal(f.el('timeFieldMessage').textContent,'Waktu selesai harus setelah waktu mulai.');
+ f.api.openNewEvent();f.el('eventStartHour').value='23';f.el('eventStartMinute').value='30';f.api.updateTimeParts('Start');assert.equal(f.el('eventEndTime').value,'');assert.equal(f.el('timeFieldMessage').textContent,'Pilih waktu selesai pada hari yang sama.');
+ f.el('eventEndHour').value='23';f.el('eventEndMinute').value='50';f.api.updateTimeParts('End');assert.equal(f.el('eventEndTime').value,'23:50');
+ const e=f.api.state.events[0];e.startTime='09:03';e.endTime='10:07';f.api.openEditEvent(e.id,e.date,'all');assert.equal(f.el('eventStartMinute').value,'03');assert.equal(f.el('eventEndMinute').value,'07');f.el('eventStartHour').value='08';f.api.updateTimeParts('Start');assert.equal(f.el('eventEndTime').value,'10:07');
+ f.el('eventStartMinute').value='60';f.api.updateTimeParts('Start');assert.equal(f.el('eventStartTime').value,'');f.el('eventStartHour').value='24';f.el('eventStartMinute').value='00';f.api.updateTimeParts('Start');assert.equal(f.el('eventStartTime').value,'');
+ });
  await test('Original localStorage v1 and all defaults preserved',()=>{const f=fixture();const raw=JSON.stringify(f.api.defaults());const g=fixture(raw);assert.equal(g.api.state.events.length,6);assert.equal(g.api.blocked,false)});
  await test('Corrupt storage retained and all writes blocked',()=>{const f=fixture('{broken');assert(f.api.blocked);assert.throws(()=>f.api.saveState());assert.equal(f.data.get('fahmiDailyPWA.v1'),'{broken')});
  await test('Quota failure rolls back memory and stored data',()=>{const f=fixture();f.api.saveState();const old=f.data.get('fahmiDailyPWA.v1');f.api.state.events=[];f.fail(true);assert.throws(()=>f.api.saveState());assert.equal(f.api.state.events.length,6);assert.equal(f.data.get('fahmiDailyPWA.v1'),old)});

@@ -98,7 +98,7 @@
       review={data,r,done,id};$('weatherRiskText').innerHTML=`<p class="weather-event-name">${safe(data.title)}</p><p class="muted">${safe(data.date)} · ${safe(data.startTime)}–${safe(data.endTime)}</p><p>Pertimbangkan mengganti waktu kegiatan.</p>`;
       let alternatives=[];
       if(r.data && !r.stale){
-        const duration=Math.max(300000,Math.ceil((window.FahmiWeather.bounds(data)[1]-window.FahmiWeather.bounds(data)[0])/300000)*300000);
+        const duration=window.FahmiWeather.bounds(data)[1]-window.FahmiWeather.bounds(data)[0];
         const originalStart=window.FahmiWeather.bounds(data)[0];
         for(const unix of [...r.data.hourly.time].sort((a,b)=>Math.abs(a*1000-originalStart)-Math.abs(b*1000-originalStart))){
           const rounded=Math.ceil(unix*1000/300000)*300000;
@@ -115,7 +115,7 @@
 
       }
       $('weatherRiskText').innerHTML+=`<details><summary>Lihat Detail</summary>${details(r,data)}</details><a class="weather-source" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo · CC BY 4.0</a>`;
-$('weatherRiskText').querySelectorAll('[data-weather-alternative]').forEach(b=>b.onclick=()=>{const e=alternatives[Number(b.dataset.weatherAlternative)];review=null;$('weatherRiskDialog').close();$('eventStartTime').value=e.startTime;$('eventEndTime').value=e.endTime;changed();});
+$('weatherRiskText').querySelectorAll('[data-weather-alternative]').forEach(b=>b.onclick=()=>{const e=alternatives[Number(b.dataset.weatherAlternative)];review=null;$('weatherRiskDialog').close();$('eventStartTime').value=e.startTime;$('eventEndTime').value=e.endTime;window.FahmiTimeFields?.assign(e.startTime,e.endTime);changed();});
       $('weatherRiskDialog').showModal();
     }
     function finishReview(cancel){
@@ -187,7 +187,7 @@ $('weatherRiskText').querySelectorAll('[data-weather-alternative]').forEach(b=>b
     $('weatherCitySearch').addEventListener('input',()=>{searchToken++;});
     $('weatherLocateBtn').onclick=()=>locate(true);
     $('weatherKeepBtn').onclick=()=>finishReview(false);$('weatherCancelBtn').onclick=()=>finishReview(true);
-    $('weatherChangeBtn').onclick=()=>{review=null;$('weatherRiskDialog').close();$('eventStartTime').focus();};
+    $('weatherChangeBtn').onclick=()=>{review=null;$('weatherRiskDialog').close();$('eventStartHour').focus();};
     $('weatherRiskDialog').addEventListener('cancel',()=>{review=null;});
     $('eventDialog').addEventListener('close',()=>{token++;searchToken++;locationRevision++;geoBusy=false;clearTimeout(timer);});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});window.addEventListener('online',()=>refresh(true));

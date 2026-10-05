@@ -340,7 +340,7 @@
   function eventCardHtml(o){
     const cat=categoryById(o.categoryId);
     const status=o.status==='done'?'<span class="status-pill done">✓ Selesai</span>':o.status==='cancelled'?'<span class="status-pill cancelled">Dibatalkan</span>':'';
-    return `<article class="event-card" data-event-id="${o.eventId}" data-date="${o.date}"><div class="event-bar" style="background:${cat.color}"></div><div class="event-main"><div class="event-time">${timeRange(o)} • ${escapeHtml(cat.name)}</div><p class="event-title">${escapeHtml(o.title)}</p>${o.location?`<p class="event-detail">⌖ ${escapeHtml(o.location)}</p>`:''}<p class="event-detail">${escapeHtml(o.date)} · ${escapeHtml(reminderLabel(o.reminderMinutes))}</p>${status || '<span class="status-pill scheduled">Terjadwal</span>'}${weatherUI?.badge(o) || ''}</div><div class="event-actions"><button class="more-btn" aria-label="Aksi kegiatan">Aksi ⋯</button></div></article>`;
+    return `<article class="event-card" data-event-id="${o.eventId}" data-date="${o.date}"><div class="event-bar" style="background:${cat.color}"></div><div class="event-main"><div class="event-time">${timeRange(o)} • ${escapeHtml(cat.name)}</div><p class="event-title">${escapeHtml(o.title)}</p>${o.location?`<p class="event-detail">⌖ ${escapeHtml(o.location)}</p>`:''}<p class="event-detail">${escapeHtml(o.date)} · ${escapeHtml(reminderLabel(o.reminderMinutes))}</p>${status || '<span class="status-pill scheduled">Terjadwal</span>'}${weatherUI?.badge(o) || ''}</div><div class="event-actions"><button class="more-btn" aria-label="Menu jadwal">⋯</button></div></article>`;
   }
 
   function emptyStateHtml(title,desc){ return `<div class="empty-state"><div class="empty-icon">◷</div><h3>${escapeHtml(title)}</h3><p class="muted">${escapeHtml(desc)}</p><button class="primary-btn inline-add" style="margin-top:12px">＋ Buat jadwal</button></div>`; }
@@ -425,14 +425,34 @@
     if(state.categories.some(c=>c.id===current)) $('eventCategory').value=current;
   }
 
-  function populateTimeOptions(start='',end=''){
-    ['eventStartTime','eventEndTime'].forEach((id,i)=>{
-      const saved=i?end:start;
-      const times=Array.from({length:288},(_,n)=>String(Math.floor(n/12)).padStart(2,'0')+':'+String(n%12*5).padStart(2,'0'));
-      if(/^\d{2}:\d{2}$/.test(saved) && !times.includes(saved))times.push(saved);
-      times.sort();
-      $(id).innerHTML=times.map(t=>`<option value="${t}">${t.replace(':','.')}</option>`).join('');
-    });
+  let timeEndManual=false;
+  function setTimeParts(kind,value){
+    const [hour='',minute='']=value.split(':');
+    $('event'+kind+'Hour').value=hour;$('event'+kind+'Minute').value=minute;
+    $('event'+kind+'Time').value=value;
+  }
+  function readTimeParts(kind){
+    const h=$('event'+kind+'Hour').value.trim(),m=$('event'+kind+'Minute').value.trim();
+    if(!/^\d{1,2}$/.test(h)||!/^\d{1,2}$/.test(m)||Number(h)>23||Number(m)>59)return '';
+    return h.padStart(2,'0')+':'+m.padStart(2,'0');
+  }
+  function refreshTimeMessage(){
+    const start=$('eventStartTime').value,end=$('eventEndTime').value;
+    const message=start && !end && !timeEndManual && Number(start.slice(0,2))>=23?'Pilih waktu selesai pada hari yang sama.':start && end && end<=start?'Waktu selesai harus setelah waktu mulai.':'';
+    $('timeFieldMessage').textContent=message;$('timeFieldMessage').classList.toggle('hidden',!message);
+  }
+  function updateTimeParts(kind){
+    if(kind==='End')timeEndManual=true;
+    $('event'+kind+'Time').value=readTimeParts(kind);
+    if(kind==='Start' && !timeEndManual){
+      const start=$('eventStartTime').value;
+      if(start && Number(start.slice(0,2))<23)setTimeParts('End',String(Number(start.slice(0,2))+1).padStart(2,'0')+start.slice(2));
+      else setTimeParts('End','');
+    }
+    refreshTimeMessage();weatherUI?.changed();
+  }
+  function populateTimeOptions(start='09:00',end='10:00',manual=false){
+    timeEndManual=manual;setTimeParts('Start',start);setTimeParts('End',end);refreshTimeMessage();
   }
   function showSettingsMenu(panel=''){
     $('settingsMenu').classList.toggle('hidden',!!panel);
@@ -460,7 +480,7 @@
     if(scope==='all') Object.assign(o,{...ev,date:ev.date,activityType:ev.activityType || 'indoor',weatherLocation:ev.weatherLocation || null,weatherAccepted:ev.weatherAccepted || '',status:ev.seriesStatus || 'scheduled'});
     editingContext={eventId, date:dk, scope}; $('eventDialogTitle').textContent=scope==='one'?'Ubah Kejadian':'Ubah Jadwal'; populateCategorySelect();
     $('eventTitle').value=o.title; $('eventCategory').value=o.categoryId; setReminderFields('event',Number(o.reminderMinutes ?? -1));
-    populateTimeOptions(o.startTime,o.endTime); $('eventDate').value=o.date; $('eventStartTime').value=o.startTime; $('eventEndTime').value=o.endTime; $('eventLocation').value=o.location||''; $('eventNotes').value=o.notes||'';
+    populateTimeOptions(o.startTime,o.endTime,true); $('eventDate').value=o.date; $('eventStartTime').value=o.startTime; $('eventEndTime').value=o.endTime; $('eventLocation').value=o.location||''; $('eventNotes').value=o.notes||'';
     if(scope==='one'){ $('eventRecurrence').value='none'; $('eventRecurrence').disabled=true; $('eventUntil').value=''; }
     else { $('eventRecurrence').disabled=false; $('eventRecurrence').value=ev.recurrence?.type||'none'; $('eventUntil').value=ev.recurrence?.until||''; setWeekdayPicker(ev.recurrence?.weekdays||[]); }
     updateRecurrenceFields(); $('eventDialog').showModal(); weatherUI?.open(o);
@@ -480,7 +500,8 @@
     if(data.activityType==='outdoor' && !validWeatherLocation(data.weatherLocation))return 'Pilih lokasi Outdoor dari pencarian kota atau lokasi perangkat.';
     if(!validReminder(data.reminderMinutes))return 'Pengingat harus berupa angka bulat antara 0 dan 4 minggu sebelum kegiatan (maksimal 40.320 menit).';
     if(!data.title||!data.date||!data.startTime||!data.endTime) return 'Lengkapi judul, tanggal, dan waktu.';
-    if(withTime(data.date,data.endTime)<=withTime(data.date,data.startTime)) return 'Jam selesai harus setelah jam mulai.';
+    if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.startTime)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.endTime))return 'Isi jam 00–23 dan menit 00–59.';
+    if(withTime(data.date,data.endTime)<=withTime(data.date,data.startTime)) return 'Waktu selesai harus setelah waktu mulai.';
     if(data.recurrence.type==='custom'&&!data.recurrence.weekdays.length) return 'Pilih minimal satu hari untuk jadwal berulang.';
     if(data.recurrence.until && parseLocalDate(data.recurrence.until)<parseLocalDate(data.date)) return 'Tanggal akhir pengulangan tidak boleh sebelum tanggal mulai.';
     return null;
@@ -713,6 +734,12 @@
   }
 
   function setupEvents(){
+    window.FahmiTimeFields={assign:(start,end)=>populateTimeOptions(start,end,true)};
+    ['Start','End'].forEach(kind=>['Hour','Minute'].forEach(part=>{
+      const el=$('event'+kind+part);
+      el.addEventListener('input',()=>updateTimeParts(kind));
+      el.addEventListener('blur',()=>{if(/^\d{1,2}$/.test(el.value))el.value=el.value.padStart(2,'0');});
+    }));
     document.querySelectorAll('[data-settings-open]').forEach(b=>b.onclick=()=>showSettingsMenu(b.dataset.settingsOpen));
     $('settingsBackBtn').onclick=()=>showSettingsMenu();
     document.querySelectorAll('.nav-item').forEach(b=>b.onclick=()=>{
@@ -756,7 +783,7 @@
   let offlineReady=false;
   function updateAppStatus(){
     document.documentElement.classList.toggle('standalone',isStandalone());
-    $('appStatus').textContent=`v1.7.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
+    $('appStatus').textContent=`v1.8.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
   }
   async function registerSW(){
     if(!('serviceWorker' in navigator) || !window.isSecureContext){updateAppStatus();return;}
