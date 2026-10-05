@@ -740,7 +740,7 @@
   function updateAppStatus(){
     document.documentElement.classList.toggle('standalone',isStandalone());
     $('installHint').classList.toggle('hidden',!isIOS() || isStandalone());
-    $('appStatus').textContent=`v1.5.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
+    $('appStatus').textContent=`v1.6.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
   }
   async function registerSW(){
     if(!('serviceWorker' in navigator) || !window.isSecureContext){updateAppStatus();return;}
@@ -800,7 +800,9 @@
     if(!window.FahmiGoogleCalendar || !window.FahmiGoogleServer){$('googleSyncStatus').textContent='Modul Google belum dimuat. Periksa update aplikasi.';return;}
     let loaded=false,busy=false,popup=null,backend;
     const render=status=>{
-      $('googleSyncStatus').textContent=status.message;
+      $('googleSyncDetail').textContent=status.message;
+      $('googleSyncStatus').textContent=status.error?'Sinkron gagal. Coba lagi.':status.running?'Menyinkronkan…':status.message.includes('Selesaikan izin')?'Selesaikan login Google.':status.message.includes('Menyelesaikan koneksi')?'Menghubungkan Google…':'';
+      $('googleSyncStatus').classList.toggle('hidden',!$('googleSyncStatus').textContent);
       $('googleSyncStatus').classList.toggle('sync-error',status.error);
       const connected=status.connected || (status.enabled && backend?.hasSession);
       const label=status.error?'Sinkron gagal':status.running?'Sedang menyinkronkan':connected && status.lastSync && !status.pending?'Sinkron selesai':connected?'Terhubung':'Belum terhubung';
@@ -867,7 +869,7 @@
     });
     $('googleCompleteBtn').onclick=()=>{
       const parts=$('googleConnectionCode').value.trim().split('.');
-      if(parts.length!==2){googleSync.fail('Tempel seluruh kode koneksi dari halaman hasil login Google.');return;}
+      if(parts.length!==2){googleSync.fail('Tempel kode koneksi melalui Lihat Detail.');return;}
       complete(parts[0],parts[1]);
     };
     $('googleSyncBtn').onclick=()=>{

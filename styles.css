@@ -278,3 +278,20 @@ input,select,textarea { max-width:100%; min-width:0; font-size:16px; }
 #weatherOverviewBanner button { display:block; width:100%; margin-top:8px; white-space:normal; height:auto; padding:12px; text-align:left; line-height:1.5; }
 #weatherFormCard p { margin:8px 0; }
 .danger { color:#973131; }
+
+/* v1.6 compact messages and location picker */
+.location-choice { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.location-choice button { font-size:14px; padding:12px 8px; }
+.location-choice [aria-pressed="true"] { background:var(--accent); color:white; }
+.location-summary { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.location-summary p { margin:0; overflow-wrap:anywhere; }
+.location-summary button { flex-shrink:0; }
+.weather-source { display:block; font-size:12px; color:var(--muted); margin-top:10px; }
+.weather-event-name { font-size:18px; font-weight:750; margin:14px 0 4px; overflow-wrap:anywhere; }
+#weatherRiskText > details { margin-top:12px; padding-top:4px; }
+#weatherRiskText > p { margin:10px 0; }
+#weatherRiskDialog .modal-actions { margin-top:16px; }
+#weatherManualFields { display:grid; gap:10px; }
+#weatherMyLocationFields button { width:100%; }
+#weatherFormCard { margin:0; }
+.weather-fields > details { margin:0; padding-top:4px; }

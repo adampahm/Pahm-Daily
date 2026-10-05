@@ -3,8 +3,10 @@
   function create({getState,getForm,getOccurrences,getConflicts,onEdit,onRefresh,escapeHtml,toast}){
     const $=id=>document.getElementById(id),api=window.FahmiWeather.create(),results=new Map();
     let selected=null,token=0,searchToken=0,timer,formStatus='scheduled',review=null,batchRunning=false,batchAgain=false,lastBatch=0;
+    let locationMode='my',locationRevision=0,geoBusy=false,autoAttempted=false,editingLocation=true,privacySeen=false,privacyVisible=false;
+    try{privacySeen=localStorage.getItem('fahmiDailyPWA.weatherLocationPrivacy.v1')==='seen';}catch{}
     const threshold=()=>getState().settings.weatherThreshold ?? 60;
-    const labels={loading:'↻ Memeriksa',rain:'☂ Risiko hujan',low:'☀ Risiko hujan rendah',unavailable:'○ Prakiraan belum tersedia',indoor:'Indoor'};
+    const labels={loading:'Memeriksa cuaca…',rain:'☂ Risiko hujan',low:'☀ Risiko hujan rendah',unavailable:'○ Prakiraan belum tersedia',indoor:'Indoor'};
     const safe=escapeHtml;
     const key=o=>o.eventId+'|'+o.date;
     function details(r,e){
@@ -12,37 +14,91 @@
       return `<strong>${safe(labels[r.state]||labels.unavailable)}</strong><p>${safe(e.weatherLocation?.name || 'Pilih lokasi kegiatan')} · ${safe(e.date)} · ${safe(e.startTime)}–${safe(e.endTime)}</p><p>${safe(r.reason || '')}</p>${r.state==='rain' || r.state==='low'?`<p>${safe(r.condition)} · ${safe(data)}${r.amount!==null?` · Curah hujan pada jam prakiraan yang tercakup: ${r.amount.toFixed(1)} mm`:''}</p><p class="muted small">Waktu lokasi: ${safe(r.localTime)} (${safe(r.zone)}). Jam jadwal mengikuti perangkat.</p>`:''}${r.at?`<p class="muted small">Diperiksa ${safe(new Date(r.at).toLocaleString('id-ID'))}${r.stale?' · Hasil lama; perlu diperbarui':''}</p>`:''}${r.error?`<p>${safe(r.error)}</p>`:''}<a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Sumber: Open-Meteo · data CC BY 4.0</a>`;
     }
     function fields(){return {activityType:$('eventActivityType').value,weatherLocation:$('eventActivityType').value==='outdoor'?selected:null};}
+    function renderLocation(message=''){
+      const picked=!!selected && !editingLocation;
+      $('weatherLocationChoice').classList.toggle('hidden',picked);
+      $('weatherManualFields').classList.toggle('hidden',picked || locationMode!=='manual');
+      $('weatherMyLocationFields').classList.toggle('hidden',picked || locationMode!=='my');
+      $('weatherChangeLocationBtn').classList.toggle('hidden',!picked);
+      $('weatherMyLocationBtn').setAttribute('aria-pressed',String(locationMode==='my'));
+      $('weatherOtherLocationBtn').setAttribute('aria-pressed',String(locationMode==='manual'));
+      $('weatherLocateBtn').disabled=geoBusy;
+      $('weatherSelectedLocation').textContent=message || selected?.name || (geoBusy?'Mendeteksi lokasi…':'');
+      $('weatherLocationPrivacy').classList.toggle('hidden',!privacyVisible);
+      $('weatherLocationHint').classList.toggle('hidden',privacyVisible || picked || geoBusy);
+    }
+    function enterOutdoor(){
+      if($('eventActivityType').value!=='outdoor')return;
+      if(!privacySeen){privacySeen=true;privacyVisible=true;try{localStorage.setItem('fahmiDailyPWA.weatherLocationPrivacy.v1','seen');}catch{}}
+      renderLocation();
+      if(!selected && locationMode==='my' && !autoAttempted){autoAttempted=true;locate(false);}
+    }
+    function chooseLocationMode(mode){
+      locationRevision++;searchToken++;geoBusy=false;selected=null;locationMode=mode;editingLocation=true;
+      $('weatherSearchResults').innerHTML='';renderLocation();changed();
+      if(mode==='my'){autoAttempted=true;locate(false);}
+    }
+    async function locate(explicit=false){
+      if(geoBusy || locationMode!=='my' || $('eventActivityType').value!=='outdoor' || !$('eventDialog').open)return;
+      const mine=++locationRevision;geoBusy=true;renderLocation();
+      const current=()=>mine===locationRevision && locationMode==='my' && $('eventActivityType').value==='outdoor' && $('eventDialog').open;
+      const failed=()=>{if(!current())return;geoBusy=false;selected=null;locationMode='manual';editingLocation=true;renderLocation('Lokasi tidak tersedia. Pilih lokasi lain.');changed();};
+      if(!navigator.geolocation){failed();return;}
+      let permission='unknown';
+      try{if(navigator.permissions?.query)permission=(await navigator.permissions.query({name:'geolocation'})).state;}catch{}
+      if(!current())return;
+      if(permission==='denied'){failed();return;}
+      if(!explicit && permission!=='granted'){geoBusy=false;renderLocation();return;}
+      try{navigator.geolocation.getCurrentPosition(position=>{
+        if(!current())return;
+        const location={name:'Lokasi Saya',latitude:Number(position.coords.latitude.toFixed(4)),longitude:Number(position.coords.longitude.toFixed(4))};
+        if(!window.FahmiWeather.validLocation(location)){failed();return;}
+        geoBusy=false;selected=location;editingLocation=false;renderLocation();changed();
+      },failed,{enableHighAccuracy:false,timeout:10000,maximumAge:300000});}catch{failed();}
+    }
     function open(event={}){
-      token++;searchToken++;clearTimeout(timer);selected=event.weatherLocation || null;formStatus=event.status || event.seriesStatus || 'scheduled';
+      token++;searchToken++;locationRevision++;clearTimeout(timer);geoBusy=false;autoAttempted=false;privacyVisible=false;
+      selected=event.weatherLocation || null;editingLocation=!selected;
+      locationMode=selected && !['Lokasi Saya','Lokasi perangkat'].includes(selected.name)?'manual':'my';
+      formStatus=event.status || event.seriesStatus || 'scheduled';
       $('eventActivityType').value=event.activityType || 'indoor';$('weatherCitySearch').value='';$('weatherSearchResults').innerHTML='';
-      $('weatherSelectedLocation').textContent=selected?.name || 'Belum ada lokasi dipilih.';changed();
+      renderLocation();changed();enterOutdoor();
+    }
+    function shortStatus(r){
+      if(r.stale)return 'Hasil lama — perbarui prakiraan';
+      if(r.state==='unavailable' && /offline/i.test(r.reason || ''))return 'Offline — coba lagi saat terhubung';
+      return r.state==='rain'?'Kemungkinan hujan':r.state==='low'?'Risiko hujan rendah':'Prakiraan belum tersedia';
+    }
+    function compactCard(r,e){
+      return `<strong>${safe(shortStatus(r))}</strong>${r.state==='rain'?'<p>Pertimbangkan mengganti waktu kegiatan.</p>':''}<details><summary>Lihat Detail</summary>${details(r,e)}</details><a class="weather-source" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo · CC BY 4.0</a>`;
     }
     function changed(){
       const mine=++token;clearTimeout(timer);
       const outdoor=$('eventActivityType').value==='outdoor';$('weatherOutdoorFields').classList.toggle('hidden',!outdoor);
       $('weatherFormCard').classList.toggle('hidden',!outdoor);
-      if(!outdoor)return;
-      $('weatherFormCard').innerHTML='<strong>↻ Memeriksa</strong><p>Pilih lokasi serta waktu kegiatan.</p>';
+      if(!outdoor){locationRevision++;geoBusy=false;return;}
+      $('weatherFormCard').innerHTML='<strong>Memeriksa cuaca…</strong>';
       timer=setTimeout(()=>checkForm(mine),650);
     }
     async function checkForm(mine=++token,force=false){
       const e=getForm(),id=window.FahmiWeather.identity(e),limit=threshold();
-      if(formStatus!=='scheduled'){if(mine===token)$('weatherFormCard').innerHTML='<strong>Cuaca kegiatan</strong><p>Kegiatan selesai atau dibatalkan tidak memicu peringatan cuaca.</p>';return {state:'indoor'};}
+      if(formStatus!=='scheduled'){if(mine===token)$('weatherFormCard').innerHTML='<strong>Pemeriksaan cuaca nonaktif</strong>';return {state:'indoor'};}
       const r=await api.check(e,limit,force);
       if(mine!==token || id!==window.FahmiWeather.identity(getForm()) || limit!==threshold())return null;
-      $('weatherFormCard').classList.toggle('weather-rain',r.state==='rain');$('weatherFormCard').innerHTML=details(r,e);
+      $('weatherFormCard').classList.toggle('weather-rain',r.state==='rain');$('weatherFormCard').innerHTML=compactCard(r,e);
       return r;
     }
     async function gate(data,done){
       if(data.activityType!=='outdoor' || formStatus!=='scheduled'){done(data);return;}
       const mine=++token,id=window.FahmiWeather.identity(data);clearTimeout(timer);
-      $('weatherFormCard').innerHTML='<strong>↻ Memeriksa sebelum menyimpan…</strong>';
+      $('weatherFormCard').innerHTML='<strong>Memeriksa cuaca…</strong>';
       const r=await checkForm(mine);
       if(!r || mine!==token || !$('eventDialog').open || window.FahmiWeather.identity(getForm())!==id)return;
       if(r.state!=='rain'){done(data);return;}
-      review={data,r,done,id};$('weatherRiskText').innerHTML='<p>Ada kemungkinan hujan saat kegiatan ini. Pertimbangkan mengganti waktu atau membatalkan kegiatan.</p>'+`<div class="weather-pill weather-rain"><strong>☂ Risiko hujan</strong><p>${safe(data.weatherLocation?.name)}<br>${safe(data.date)} · ${safe(data.startTime)}–${safe(data.endTime)}</p><p>${safe(r.reason)}</p></div><details><summary>Lihat detail prakiraan</summary>${details(r,data)}</details>`;
+      review={data,r,done,id};$('weatherRiskText').innerHTML=`<p class="weather-event-name">${safe(data.title)}</p><p class="muted">${safe(data.date)} · ${safe(data.startTime)}–${safe(data.endTime)}</p><p>Pertimbangkan mengganti waktu kegiatan.</p>`;
+      let alternatives=[];
       if(r.data && !r.stale){
-        const duration=window.FahmiWeather.bounds(data)[1]-window.FahmiWeather.bounds(data)[0],alternatives=[];
+        const duration=window.FahmiWeather.bounds(data)[1]-window.FahmiWeather.bounds(data)[0];
         const originalStart=window.FahmiWeather.bounds(data)[0];
         for(const unix of [...r.data.hourly.time].sort((a,b)=>Math.abs(a*1000-originalStart)-Math.abs(b*1000-originalStart))){
           const start=new Date(unix*1000),end=new Date(unix*1000+duration),pad=n=>String(n).padStart(2,'0');
@@ -52,11 +108,13 @@
           const candidate={...data,startTime:time(start),endTime:time(end)};
           const alt=window.FahmiWeather.analyze(r.data,candidate,threshold());
           if(alt.state!=='low' || getConflicts(candidate).length)continue;
-          alternatives.push(candidate);if(alternatives.length===3)break;
+          alternatives.push(candidate);if(alternatives.length===2)break;
         }
-        $('weatherRiskText').innerHTML+=alternatives.length?'<p>Alternatif pada tanggal yang sama (06:00–21:00), risiko lebih rendah dan bebas bentrok:</p>'+alternatives.map((e,i)=>`<button class="soft-btn" data-weather-alternative="${i}">${safe(e.startTime)}–${safe(e.endTime)}</button>`).join(' '):'<p>Tidak ditemukan alternatif yang lebih rendah risikonya dan bebas bentrok pada tanggal yang sama (06:00–21:00).</p>';
-        $('weatherRiskText').querySelectorAll('[data-weather-alternative]').forEach(b=>b.onclick=()=>{const e=alternatives[Number(b.dataset.weatherAlternative)];review=null;$('weatherRiskDialog').close();$('eventStartTime').value=e.startTime;$('eventEndTime').value=e.endTime;changed();});
+        $('weatherRiskText').innerHTML+=alternatives.length?'<p class="muted small">Pilihan waktu lain</p>'+alternatives.map((e,i)=>`<button class="soft-btn" data-weather-alternative="${i}">${safe(e.startTime)}–${safe(e.endTime)}</button>`).join(' '):'';
+
       }
+      $('weatherRiskText').innerHTML+=`<details><summary>Lihat Detail</summary>${details(r,data)}</details><a class="weather-source" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo · CC BY 4.0</a>`;
+$('weatherRiskText').querySelectorAll('[data-weather-alternative]').forEach(b=>b.onclick=()=>{const e=alternatives[Number(b.dataset.weatherAlternative)];review=null;$('weatherRiskDialog').close();$('eventStartTime').value=e.startTime;$('eventEndTime').value=e.endTime;changed();});
       $('weatherRiskDialog').showModal();
     }
     function finishReview(cancel){
@@ -70,10 +128,10 @@
       const storageKey='fahmiDailyPWA.weatherAlerts.v1',stamp=key(o)+'|'+r.signature;let seen={};
       try{seen=JSON.parse(localStorage.getItem(storageKey)||'{}');if(seen[stamp])return;}catch{return;}
       try{
-        const body=`${o.title}: ${o.date}, ${o.startTime}–${o.endTime}. ${r.reason} Buka Fahmi Daily untuk mengubah atau membatalkan.`;
+        const body=`${o.title}: ${o.date}, ${o.startTime}–${o.endTime}. Pertimbangkan mengganti waktu kegiatan.`;
         const reg=await navigator.serviceWorker?.getRegistration('./');
-        if(reg)await reg.showNotification('Kemungkinan hujan pada kegiatan Outdoor',{body,icon:'./icons/icon-192.png',tag:'weather-'+o.eventId+'-'+o.date});
-        else new Notification('Kemungkinan hujan pada kegiatan Outdoor',{body});
+        if(reg)await reg.showNotification('Kemungkinan hujan',{body,icon:'./icons/icon-192.png',tag:'weather-'+o.eventId+'-'+o.date});
+        else new Notification('Kemungkinan hujan',{body});
         seen[stamp]=Date.now();for(const [k,v] of Object.entries(seen))if(v<Date.now()-17*86400000)delete seen[k];
         localStorage.setItem(storageKey,JSON.stringify(seen));
       }catch{}
@@ -99,7 +157,7 @@
         batchRunning=false;
         const risks=[...results.values()].filter(r=>r.state==='rain');
         $('weatherOverviewBanner').classList.toggle('hidden',!risks.length);
-        $('weatherOverviewBanner').innerHTML=risks.length?`<strong>☂ ${risks.length} kegiatan Outdoor berisiko hujan</strong><p>Prakiraan dapat berubah. Buka kegiatan untuk mengubah waktu atau membatalkan.</p>`+risks.slice(0,5).map((r,i)=>`<button class="soft-btn" data-weather-open="${i}">${safe(r.event.title)} · ${safe(r.event.date)} · ${safe(r.event.startTime)}${r.stale?' · Hasil lama':''}</button>`).join(''):'';
+        $('weatherOverviewBanner').innerHTML=risks.length?`<strong>☂ ${risks.length} kegiatan Outdoor berisiko hujan</strong>`+risks.slice(0,5).map((r,i)=>`<button class="soft-btn" data-weather-open="${i}">${safe(r.event.title)} · ${safe(r.event.date)} · ${safe(r.event.startTime)}${r.stale?' · Hasil lama':''}</button>`).join(''):'';
         $('weatherOverviewBanner').querySelectorAll('[data-weather-open]').forEach(b=>b.onclick=()=>{const o=risks[Number(b.dataset.weatherOpen)].event;onEdit?.(o.eventId,o.date);});
         onRefresh();if(batchAgain){batchAgain=false;refresh(true);}
       }
@@ -109,9 +167,12 @@
       if(o.status!=='scheduled')return '<p class="event-detail">Outdoor · Pemeriksaan cuaca nonaktif</p>';
       const r=results.get(key(o));const valid=r && r.identity===window.FahmiWeather.identity(o) && r.threshold===threshold();
       const label=valid?labels[r.state]:'○ Prakiraan belum tersedia',stale=valid && (r.stale || (r.at && Date.now()-r.at>=window.FahmiWeather.TTL));
-      return `<p class="weather-pill ${valid && r.state==='rain'?'weather-rain':''}">Outdoor · ${safe(label)}${stale?' · Hasil lama':''}</p>${valid && r.state==='rain'?'<p class="event-detail">Buka jadwal untuk mengubah waktu atau membatalkan.</p>':''}`;
+      return `<p class="weather-pill ${valid && r.state==='rain'?'weather-rain':''}">Outdoor · ${safe(label)}${stale?' · Hasil lama':''}</p>`;
     }
-    $('eventActivityType').onchange=changed;
+    $('eventActivityType').onchange=()=>{changed();enterOutdoor();};
+    $('weatherMyLocationBtn').onclick=()=>chooseLocationMode('my');
+    $('weatherOtherLocationBtn').onclick=()=>chooseLocationMode('manual');
+    $('weatherChangeLocationBtn').onclick=()=>{editingLocation=true;renderLocation();};
     for(const id of ['eventDate','eventStartTime','eventEndTime'])$(id).addEventListener('change',changed);
     $('weatherRetryBtn').onclick=()=>{const mine=++token;checkForm(mine,true);};
     $('weatherSearchBtn').onclick=async()=>{
@@ -119,22 +180,15 @@
       $('weatherSearchResults').textContent='Mencari lokasi…';
       try{const found=await api.search(query);if(mine!==searchToken || query!==$('weatherCitySearch').value.trim())return;
         $('weatherSearchResults').innerHTML=found.length?found.map((l,i)=>`<button type="button" class="list-action" data-weather-place="${i}">${safe(l.name)}</button>`).join(''):'Lokasi tidak ditemukan. Coba nama kota lain.';
-        $('weatherSearchResults').querySelectorAll('[data-weather-place]').forEach(b=>b.onclick=()=>{searchToken++;selected=found[Number(b.dataset.weatherPlace)];$('weatherSelectedLocation').textContent=selected.name;$('weatherSearchResults').innerHTML='';changed();});
+        $('weatherSearchResults').querySelectorAll('[data-weather-place]').forEach(b=>b.onclick=()=>{searchToken++;locationRevision++;geoBusy=false;selected=found[Number(b.dataset.weatherPlace)];locationMode='manual';editingLocation=false;renderLocation();$('weatherSearchResults').innerHTML='';changed();});
       }catch(error){if(mine===searchToken)$('weatherSearchResults').textContent=error.name==='AbortError'?'Pencarian lokasi terlalu lama. Coba Lagi.':error.message;}
     };
     $('weatherCitySearch').addEventListener('input',()=>{searchToken++;});
-    $('weatherLocateBtn').onclick=()=>{
-      if(!navigator.geolocation){toast('Lokasi perangkat tidak tersedia. Cari kota secara manual.');return;}
-      const mine=++searchToken;$('weatherSelectedLocation').textContent='Meminta lokasi perangkat…';
-      navigator.geolocation.getCurrentPosition(position=>{
-        if(mine!==searchToken)return;selected={name:'Lokasi perangkat',latitude:Number(position.coords.latitude.toFixed(4)),longitude:Number(position.coords.longitude.toFixed(4))};
-        $('weatherSelectedLocation').textContent='Lokasi perangkat dipilih. Koordinat dikirim ke Open-Meteo untuk pemeriksaan.';changed();
-      },()=>{if(mine===searchToken)$('weatherSelectedLocation').textContent='Izin lokasi ditolak atau lokasi tidak tersedia. Cari kota secara manual.';},{enableHighAccuracy:false,timeout:10000,maximumAge:300000});
-    };
+    $('weatherLocateBtn').onclick=()=>locate(true);
     $('weatherKeepBtn').onclick=()=>finishReview(false);$('weatherCancelBtn').onclick=()=>finishReview(true);
     $('weatherChangeBtn').onclick=()=>{review=null;$('weatherRiskDialog').close();$('eventStartTime').focus();};
     $('weatherRiskDialog').addEventListener('cancel',()=>{review=null;});
-    $('eventDialog').addEventListener('close',()=>{token++;clearTimeout(timer);});
+    $('eventDialog').addEventListener('close',()=>{token++;searchToken++;locationRevision++;geoBusy=false;clearTimeout(timer);});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});window.addEventListener('online',()=>refresh(true));
     window.setInterval?.(()=>refresh(),30*60000);
     return {fields,open,gate,badge,refresh,changed};
