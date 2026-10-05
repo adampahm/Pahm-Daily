@@ -1,10 +1,10 @@
-# Verifikasi v1.4.0
-
-- 17 tes aplikasi: data v1, backup/restore, pengingat 5 menit/kustom, batas 28 hari, bawaan tidak mengubah jadwal lama, pengecualian berulang, lokal 0/28 hari dan deduplikasi.
-- 26 tes Google Calendar dengan Google dimock: regresi OAuth/sinkron, pembaruan pengingat memakai ID yang sama tanpa POST/DELETE, normalisasi waktu Google, retry respons PUT hilang, waktu sinkron terakhir setelah reload.
-- 10 tes backend/browser authentication dengan SQLite nyata dan Google dimock. Kode backend tidak berubah.
-- Tes service worker: instalasi atomik, cache sesuai scope, offline, update, sumber eksternal tidak dicache.
-- Browser: viewport 320,390,1280 piksel; tidak ada overflow horizontal; bawaan 5 menit, formulir kustom 2 jam, simpan jadwal, penolakan nilai 40321, log tanpa error/warning. Screenshot adalah pratinjau lokal dengan data contoh dan Google belum terhubung.
-- JavaScript, ID HTML, aset, manifest dan integritas ZIP diperiksa.
-
-Tes OAuth/Calendar memakai mock, bukan login Google produksi. Pengingat suara pada perangkat fisik dan sinkron versi ini di akun pengguna perlu diperiksa setelah unggah. Integrasi versi 1.3 telah dikonfirmasi berfungsi oleh pengguna.
+# Verifikasi v1.5.0
+- 20 tes aplikasi: regresi data/backup/pengingat, metadata Outdoor dan koordinat, ambang, exception berulang, pembatalan sesuai scope.
+- 27 tes Calendar dengan Google dimock: regresi OAuth/sinkron dan pembaruan waktu/pembatalan Outdoor; metadata cuaca tidak menduplikasi acara.
+- 11 tes cuaca dengan forecast/notifikasi dimock: rentang per jam/ujung parsial, kode hujan/badai, null/unknown, threshold, zona waktu berbeda, out-of-range, cache/offline, input lokasi, request bersamaan, konfirmasi tindakan, respons lama, izin lokasi ditolak, notifikasi sekali dan status selesai/dibatalkan.
+- 10 tes backend/authentication dengan SQLite nyata, Google dimock. Backend tidak berubah.
+- Service worker: 12 aset inti, offline di subpath, update, cache sesuai scope; API eksternal tidak dicache.
+- Browser memakai API Open-Meteo nyata: pencarian Bandung, prakiraan hujan per jam, dialog hujan dan alternatif bebas bentrok, Ubah Waktu ke 19:00–20:00 dan simpan. Tampilan iPhone/desktop diperiksa.
+- Tidak melakukan login Google produksi di pengujian versi ini, serta tidak menguji push/notifikasi pada iPhone fisik. Geolocation denial diuji memakai simulasi.
+- JS syntax, ID HTML, aset, manifest, integritas ZIP diperiksa.
+Screenshot pratinjau lokal menggunakan jadwal contoh dan data prakiraan yang dapat berubah; bukan tampilan akun Google produksi.

@@ -9,7 +9,7 @@ function fixture(raw=null){
   window:{addEventListener(){},matchMedia(){return{matches:false}},isSecureContext:true},navigator:{userAgent:'iPhone',platform:'iPhone',maxTouchPoints:1,standalone:false},
   document:{hidden:false,getElementById:el,querySelectorAll(){return[]}},alert:m=>alerts.push(m),confirm:()=>true,
   localStorage:{getItem:k=>data.get(k)??null,setItem(k,v){if(fail)throw Error('quota');data.set(k,v)}}};
- const code=source.slice(0,source.indexOf('  setupReminderSettings(); setupEvents();'))+`
+ const code=source.slice(0,source.indexOf('  setupWeather(); setupReminderSettings(); setupEvents();'))+`
  const originalCheckReminders=checkReminders;
  renderAll=()=>{};renderCalendar=()=>{};populateCategorySelect=()=>{};updateRecurrenceFields=()=>{};clearWeekdayPicker=()=>{};setWeekdayPicker=()=>{};
  toast=()=>{};checkReminders=()=>{};chooseScope=async()=>globalThis.scope||'one';shareOrDownload=async f=>globalThis.files.push(f);
@@ -76,6 +76,22 @@ async function test(name,fn){await fn();results.push({name,status:'PASS'});conso
   f.api.state.events=[{...event,id:'long-reminder',date:'2026-11-02',startTime:'09:00',endTime:'10:00',reminderMinutes:40320,recurrence:{type:'none'}},{...event,id:'zero-reminder',date:'2026-10-05',startTime:'09:00',endTime:'10:00',reminderMinutes:0,recurrence:{type:'none'}}];
   f.api.saveState();await f.api.checkReminders();assert.equal(count,2);await f.api.checkReminders();assert.equal(count,2);
   fixed+=15*86400000;await f.api.checkReminders();assert.equal(count,2);
+ });
+ await test('Outdoor coordinates, threshold, risk decision and recurring exception survive backup/reload',async()=>{
+  const f=fixture(),outdoor={...event,activityType:'outdoor',weatherLocation:{name:'Bandung',latitude:-6.9,longitude:107.6},weatherAccepted:'weather-risk-proof'};
+  f.api.commitForm(outdoor);const id=f.api.state.events.at(-1).id;f.api.editing={eventId:id,date:event.date,scope:'one'};f.api.commitForm({...outdoor,startTime:'22:00',endTime:'23:00'});
+  f.api.state.settings.weatherThreshold=75;f.api.saveState();await f.api.exportBackup();const g=fixture();await g.api.importBackup(f.files.at(-1));const o=g.api.occurrenceFor(g.api.state.events.at(-1),new Date(2026,9,4,12));assert.equal(o.activityType,'outdoor');assert.equal(o.weatherLocation.latitude,-6.9);assert.equal(o.startTime,'22:00');assert.equal(g.api.state.settings.weatherThreshold,75);
+  assert.equal(fixture(f.data.get('fahmiDailyPWA.v1')).api.state.events.at(-1).weatherAccepted,'weather-risk-proof');
+ });
+ await test('Outdoor data rejects invalid coordinates/threshold; old schedules remain Indoor',()=>{
+  const f=fixture();assert.equal(f.api.occurrenceFor(f.api.state.events[0],new Date(2026,9,5,12)).activityType,'indoor');
+  const b=f.api.defaults();b.events[0].activityType='outdoor';assert.throws(()=>f.api.normalizeState(b));b.events[0].weatherLocation={name:'Bad',latitude:200,longitude:0};assert.throws(()=>f.api.normalizeState(b));b.events[0].weatherLocation={name:'Bandung',latitude:-6.9,longitude:107.6};b.settings.weatherThreshold=101;assert.throws(()=>f.api.normalizeState(b));
+ });
+ await test('Weather cancellation respects new/all/one/moved recurrence scope without extra copy',()=>{
+  const f=fixture();f.api.commitForm(event,true);const id=f.api.state.events.at(-1).id;assert.equal(f.api.state.events.at(-1).seriesStatus,'cancelled');
+  f.api.editing={eventId:id,date:event.date,scope:'one'};f.api.commitForm(event,true);assert.equal(f.api.state.exceptions[id+'|'+event.date].status,'cancelled');
+  f.api.editing={eventId:id,date:event.date,scope:'all'};f.api.commitForm({...event,title:'Edited'},true);assert.equal(f.api.state.events.length,7);
+  f.api.editing={eventId:id,date:event.date,scope:'one'};f.api.commitForm({...event,date:'2026-10-12'},true);assert(f.api.state.exceptions[id+'|'+event.date].deleted);assert.equal(f.api.state.events.at(-1).seriesStatus,'cancelled');
  });
  console.log(`${results.length} app tests passed.`);
 })().catch(e=>{console.error(e);process.exitCode=1});

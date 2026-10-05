@@ -56,7 +56,7 @@
     exceptions: {},
     filters: [],
     notified: {},
-    settings: { calendarMode: 'month', defaultReminderMinutes: -1 }
+    settings: { calendarMode: 'month', defaultReminderMinutes: -1, weatherThreshold:60 }
   });
 
   function course(title, date, startTime, endTime, location, weekday){
@@ -89,7 +89,11 @@
     const validFields = e => typeof e.title === 'string' && !!e.title.trim() && ids.has(e.categoryId) &&
       validDate(e.date) && validTime(e.startTime) && validTime(e.endTime) && e.endTime > e.startTime &&
       (e.location === undefined || typeof e.location === 'string') && (e.notes === undefined || typeof e.notes === 'string') &&
-      validReminder(Number(e.reminderMinutes ?? -1));
+      validReminder(Number(e.reminderMinutes ?? -1)) &&
+      (e.activityType===undefined || ['indoor','outdoor'].includes(e.activityType)) &&
+      (e.weatherLocation===undefined || e.weatherLocation===null || validWeatherLocation(e.weatherLocation)) &&
+      (e.activityType!=='outdoor' || validWeatherLocation(e.weatherLocation)) &&
+      (e.weatherAccepted===undefined || (typeof e.weatherAccepted==='string' && e.weatherAccepted.length<=1000));
     for(const e of data.events){
       if(!isObject(e) || !validId(e.id) || eventIds.has(e.id) || !validFields(e) ||
         (e.seriesStatus !== undefined && !validStatus(e.seriesStatus))) throw new Error('Jadwal backup tidak valid.');
@@ -106,7 +110,7 @@
       if(extra !== undefined || !eventIds.has(id) || !validDate(date) || !isObject(ex) ||
         (ex.status !== undefined && !validStatus(ex.status)) || (ex.deleted !== undefined && typeof ex.deleted !== 'boolean')) throw new Error('Exception tidak valid.');
       if(ex.overrides){
-        const allowed=['title','categoryId','date','startTime','endTime','location','notes','reminderMinutes'];
+        const allowed=['title','categoryId','date','startTime','endTime','location','notes','reminderMinutes','activityType','weatherLocation','weatherAccepted'];
         const base=data.events.find(e=>e.id===id);
         if(!isObject(ex.overrides) || Object.keys(ex.overrides).some(k=>!allowed.includes(k)) ||
           (ex.overrides.date !== undefined && ex.overrides.date !== date) || !validFields({...base,date,...ex.overrides})) throw new Error('Perubahan kejadian tidak valid.');
@@ -116,7 +120,8 @@
     if(data.notified !== undefined && (!isObject(data.notified) || Object.values(data.notified).some(v=>!Number.isFinite(v)))) throw new Error('Pengingat tidak valid.');
     if(data.settings !== undefined && (!isObject(data.settings) || (data.settings.calendarMode && !['day','week','month'].includes(data.settings.calendarMode)))) throw new Error('Pengaturan tidak valid.');
     if(data.settings?.defaultReminderMinutes !== undefined && !validReminder(data.settings.defaultReminderMinutes)) throw new Error('Pengingat bawaan tidak valid.');
-    return {...data,version:1,initialized:true,exceptions:data.exceptions || {},filters:data.filters || [],notified:data.notified || {},settings:{calendarMode:'month',defaultReminderMinutes:-1,...(data.settings || {})}};
+    if(data.settings?.weatherThreshold!==undefined && (!Number.isInteger(data.settings.weatherThreshold) || data.settings.weatherThreshold<1 || data.settings.weatherThreshold>100))throw new Error('Ambang cuaca tidak valid.');
+    return {...data,version:1,initialized:true,exceptions:data.exceptions || {},filters:data.filters || [],notified:data.notified || {},settings:{calendarMode:'month',defaultReminderMinutes:-1,weatherThreshold:60,...(data.settings || {})}};
   }
   function loadState(){
     try {
@@ -134,6 +139,7 @@
   let state = loadState();
   let committedState = JSON.stringify(state);
   let googleSync=null;
+  let weatherUI=null;
   const scheduleSignature = () => JSON.stringify({events:state.events,exceptions:state.exceptions,categories:state.categories});
   let lastScheduleSignature=scheduleSignature();
   function storageFailure(message){
@@ -162,7 +168,7 @@
       throw error;
     }
     const signature=scheduleSignature();
-    if(signature!==lastScheduleSignature){lastScheduleSignature=signature;googleSync?.changed();}
+    if(signature!==lastScheduleSignature){lastScheduleSignature=signature;googleSync?.changed();weatherUI?.refresh(true);}
   }
   const handleStorageError = error => {
     if(error?.name !== 'StorageWriteError') return false;
@@ -206,6 +212,7 @@
       eventId:event.id, date:dk, title:event.title, categoryId:event.categoryId,
       startTime:event.startTime, endTime:event.endTime, location:event.location || '', notes:event.notes || '',
       reminderMinutes:Number(event.reminderMinutes ?? -1), recurrence:event.recurrence,
+      activityType:event.activityType || 'indoor',weatherLocation:event.weatherLocation || null,weatherAccepted:event.weatherAccepted || '',
       status:event.seriesStatus || 'scheduled', isRecurring:(event.recurrence?.type || 'none') !== 'none'
     };
     if (ex?.overrides) Object.assign(o, ex.overrides);
@@ -333,7 +340,7 @@
   function eventCardHtml(o){
     const cat=categoryById(o.categoryId);
     const status=o.status==='done'?'<span class="status-pill done">✓ Selesai</span>':o.status==='cancelled'?'<span class="status-pill cancelled">Dibatalkan</span>':'';
-    return `<article class="event-card" data-event-id="${o.eventId}" data-date="${o.date}"><div class="event-bar" style="background:${cat.color}"></div><div class="event-main"><div class="event-time">${timeRange(o)} • ${escapeHtml(cat.name)}</div><p class="event-title">${escapeHtml(o.title)}</p>${o.location?`<p class="event-detail">⌖ ${escapeHtml(o.location)}</p>`:''}<p class="event-detail">${escapeHtml(o.date)} · ${escapeHtml(reminderLabel(o.reminderMinutes))}</p>${status || '<span class="status-pill scheduled">Terjadwal</span>'}</div><div class="event-actions"><button class="more-btn" aria-label="Aksi kegiatan">Aksi ⋯</button></div></article>`;
+    return `<article class="event-card" data-event-id="${o.eventId}" data-date="${o.date}"><div class="event-bar" style="background:${cat.color}"></div><div class="event-main"><div class="event-time">${timeRange(o)} • ${escapeHtml(cat.name)}</div><p class="event-title">${escapeHtml(o.title)}</p>${o.location?`<p class="event-detail">⌖ ${escapeHtml(o.location)}</p>`:''}<p class="event-detail">${escapeHtml(o.date)} · ${escapeHtml(reminderLabel(o.reminderMinutes))}</p>${status || '<span class="status-pill scheduled">Terjadwal</span>'}${weatherUI?.badge(o) || ''}</div><div class="event-actions"><button class="more-btn" aria-label="Aksi kegiatan">Aksi ⋯</button></div></article>`;
   }
 
   function emptyStateHtml(title,desc){ return `<div class="empty-state"><div class="empty-icon">◷</div><h3>${escapeHtml(title)}</h3><p class="muted">${escapeHtml(desc)}</p><button class="primary-btn inline-add" style="margin-top:12px">＋ Buat jadwal</button></div>`; }
@@ -350,6 +357,19 @@
     $('calendarCanvas').querySelectorAll('[data-date]').forEach(b=>b.onclick=()=>{selectedDate=parseLocalDate(b.dataset.date);calendarCursor=new Date(selectedDate);renderCalendar();});
   }
 
+  function validWeatherLocation(l){return isObject(l) && typeof l.name==='string' && l.name.trim().length>0 && l.name.length<=200 && Number.isFinite(l.latitude) && Math.abs(l.latitude)<=90 && Number.isFinite(l.longitude) && Math.abs(l.longitude)<=180;}
+  function setupWeather(){
+    if(!window.FahmiWeatherUI)return;
+    weatherUI=window.FahmiWeatherUI.create({getState:()=>state,getForm:gatherForm,getOccurrences:(start,end)=>occurrencesBetween(start,end,{filters:[]}),getConflicts:data=>candidateConflicts(data,editingContext),onEdit:openEditFlow,onRefresh:()=>{renderToday();renderCalendar();},escapeHtml,toast});
+    $('weatherThreshold').value=String(state.settings.weatherThreshold ?? 60);
+    $('weatherSettingsSaveBtn').onclick=()=>{const n=Number($('weatherThreshold').value);if(!Number.isInteger(n) || n<1 || n>100){toast('Ambang harus berupa angka bulat 1–100%.');return;}try{state.settings.weatherThreshold=n;saveState();weatherUI.changed();weatherUI.refresh(true);toast('Ambang risiko hujan disimpan.');}catch(error){handleStorageError(error);}};
+    $('weatherRefreshAllBtn').onclick=()=>weatherUI.refresh(true);
+  }
+  function finishEventSave(data,cancel=false){
+    const conflicts=cancel?[]:candidateConflicts(data,editingContext);
+    if(conflicts.length){pendingSave=()=>commitForm(data,cancel);$('conflictText').textContent=`Bertabrakan dengan ${conflicts.map(x=>x.title).join(', ')}. Anda tetap dapat menyimpan jadwal.`;$('conflictDialog').showModal();return;}
+    commitForm(data,cancel);
+  }
   function validReminder(minutes){ return Number.isInteger(minutes) && (minutes===-1 || (minutes>=0 && minutes<=40320)); }
   function reminderLabel(minutes){
     if(minutes<0)return 'Tidak ada pengingat';
@@ -393,6 +413,7 @@
 
   function renderSettings(){
     setReminderFields('default',state.settings.defaultReminderMinutes ?? -1);
+    $('weatherThreshold').value=String(state.settings.weatherThreshold ?? 60);
     $('defaultReminderSummary').textContent='Untuk jadwal baru: '+reminderLabel(state.settings.defaultReminderMinutes ?? -1)+'.';
     $('categoryList').innerHTML=state.categories.map(c=>`<div class="category-row"><div class="category-ident"><span class="category-swatch" style="background:${c.color}"></span><strong>${escapeHtml(c.name)}</strong></div>${c.builtin?'':'<button class="text-btn" data-delete-category="'+c.id+'">Hapus</button>'}</div>`).join('');
     $('categoryList').querySelectorAll('[data-delete-category]').forEach(b=>b.onclick=()=>deleteCategory(b.dataset.deleteCategory));
@@ -409,7 +430,7 @@
     $('eventForm').reset(); populateCategorySelect();
     $('eventCategory').value=state.categories[0]?.id || 'pribadi'; setReminderFields('event',state.settings.defaultReminderMinutes ?? -1); $('eventDate').value=dk;
     $('eventStartTime').value='09:00'; $('eventEndTime').value='10:00'; $('eventRecurrence').value='none';
-    $('eventRecurrence').disabled=false; clearWeekdayPicker(); updateRecurrenceFields(); $('eventDialog').showModal();
+    $('eventRecurrence').disabled=false; clearWeekdayPicker(); updateRecurrenceFields(); $('eventDialog').showModal(); weatherUI?.open();
   }
 
   function openEditFlow(eventId,dk){
@@ -421,13 +442,13 @@
 
   function openEditEvent(eventId,dk,scope){
     const ev=state.events.find(e=>e.id===eventId); const o=ev&&occurrenceFor(ev,parseLocalDate(dk)); if(!ev||!o)return;
-    if(scope==='all') Object.assign(o,{...ev,date:ev.date});
+    if(scope==='all') Object.assign(o,{...ev,date:ev.date,activityType:ev.activityType || 'indoor',weatherLocation:ev.weatherLocation || null,weatherAccepted:ev.weatherAccepted || '',status:ev.seriesStatus || 'scheduled'});
     editingContext={eventId, date:dk, scope}; $('eventDialogTitle').textContent=scope==='one'?'Ubah Kejadian':'Ubah Jadwal'; populateCategorySelect();
     $('eventTitle').value=o.title; $('eventCategory').value=o.categoryId; setReminderFields('event',Number(o.reminderMinutes ?? -1));
     $('eventDate').value=o.date; $('eventStartTime').value=o.startTime; $('eventEndTime').value=o.endTime; $('eventLocation').value=o.location||''; $('eventNotes').value=o.notes||'';
     if(scope==='one'){ $('eventRecurrence').value='none'; $('eventRecurrence').disabled=true; $('eventUntil').value=''; }
     else { $('eventRecurrence').disabled=false; $('eventRecurrence').value=ev.recurrence?.type||'none'; $('eventUntil').value=ev.recurrence?.until||''; setWeekdayPicker(ev.recurrence?.weekdays||[]); }
-    updateRecurrenceFields(); $('eventDialog').showModal();
+    updateRecurrenceFields(); $('eventDialog').showModal(); weatherUI?.open(o);
   }
 
   function gatherForm(){
@@ -436,11 +457,12 @@
     return {
       title:$('eventTitle').value.trim(), categoryId:$('eventCategory').value, date:$('eventDate').value,
       startTime:$('eventStartTime').value, endTime:$('eventEndTime').value, location:$('eventLocation').value.trim(), notes:$('eventNotes').value.trim(),
-      reminderMinutes:readReminderFields('event'), recurrence:{type,weekdays,until:type==='none'?null:($('eventUntil').value||null)}
+      ...(weatherUI?.fields() || {}),reminderMinutes:readReminderFields('event'), recurrence:{type,weekdays,until:type==='none'?null:($('eventUntil').value||null)}
     };
   }
 
   function validateForm(data){
+    if(data.activityType==='outdoor' && !validWeatherLocation(data.weatherLocation))return 'Pilih lokasi Outdoor dari pencarian kota atau lokasi perangkat.';
     if(!validReminder(data.reminderMinutes))return 'Pengingat harus berupa angka bulat antara 0 dan 4 minggu sebelum kegiatan (maksimal 40.320 menit).';
     if(!data.title||!data.date||!data.startTime||!data.endTime) return 'Lengkapi judul, tanggal, dan waktu.';
     if(withTime(data.date,data.endTime)<=withTime(data.date,data.startTime)) return 'Jam selesai harus setelah jam mulai.';
@@ -466,21 +488,21 @@
     return conflicts;
   }
 
-  function commitForm(data){
-    if(!editingContext){ state.events.push({...data,id:uid(),createdAt:Date.now()}); }
+  function commitForm(data,cancel=false){
+    if(!editingContext){ state.events.push({...data,...(cancel?{seriesStatus:'cancelled'}:{}),id:uid(),createdAt:Date.now()}); }
     else if(editingContext.scope==='all'){
-      const i=state.events.findIndex(e=>e.id===editingContext.eventId); if(i>=0)state.events[i]={...state.events[i],...data};
+      const i=state.events.findIndex(e=>e.id===editingContext.eventId); if(i>=0)state.events[i]={...state.events[i],...data,...(cancel?{seriesStatus:'cancelled'}:{})};
     } else {
       const key=occurrenceKey(editingContext.eventId,editingContext.date);
       if(data.date !== editingContext.date){
         state.exceptions[key]={...(state.exceptions[key]||{}),deleted:true};
-        state.events.push({...data,id:uid(),recurrence:{type:'none',weekdays:[],until:null},createdAt:Date.now(),parentSeriesId:editingContext.eventId});
+        state.events.push({...data,...(cancel?{seriesStatus:'cancelled'}:{}),id:uid(),recurrence:{type:'none',weekdays:[],until:null},createdAt:Date.now(),parentSeriesId:editingContext.eventId});
       } else {
         const existing=state.exceptions[key]||{};
-        state.exceptions[key]={...existing,overrides:{title:data.title,categoryId:data.categoryId,date:data.date,startTime:data.startTime,endTime:data.endTime,location:data.location,notes:data.notes,reminderMinutes:data.reminderMinutes}};
+        state.exceptions[key]={...existing,...(cancel?{status:'cancelled'}:{}),overrides:{title:data.title,categoryId:data.categoryId,date:data.date,startTime:data.startTime,endTime:data.endTime,location:data.location,notes:data.notes,reminderMinutes:data.reminderMinutes,activityType:data.activityType || 'indoor',weatherLocation:data.weatherLocation || null,weatherAccepted:data.weatherAccepted || ''}};
       }
     }
-    saveState(); $('eventDialog').close(); editingContext=null; renderAll(); checkReminders(); toast('Jadwal disimpan');
+    saveState(); $('eventDialog').close(); editingContext=null; renderAll(); checkReminders(); toast(cancel?'Kegiatan dibatalkan':'Jadwal disimpan');
   }
 
   function openActionSheet(eventId,dk){
@@ -687,9 +709,7 @@
     $('eventForm').addEventListener('submit',e=>{
       e.preventDefault(); const data=gatherForm(); const err=validateForm(data); if(err){toast(err);return;}
       if(data.reminderMinutes>=0 && 'Notification' in window && Notification.permission==='default') requestNotifications();
-      const conflicts=candidateConflicts(data,editingContext);
-      if(conflicts.length){pendingSave=()=>commitForm(data);$('conflictText').textContent=`Bertabrakan dengan ${conflicts.map(x=>x.title).join(', ')}. Anda tetap dapat menyimpan jadwal.`;$('conflictDialog').showModal();return;}
-      commitForm(data);
+      if(weatherUI)weatherUI.gate(data,finishEventSave);else finishEventSave(data);
     });
     $('scopeOneBtn').onclick=()=>{$('scopeDialog').close();scopeResolver?.('one');scopeResolver=null;};
     $('scopeAllBtn').onclick=()=>{$('scopeDialog').close();scopeResolver?.('all');scopeResolver=null;};
@@ -720,7 +740,7 @@
   function updateAppStatus(){
     document.documentElement.classList.toggle('standalone',isStandalone());
     $('installHint').classList.toggle('hidden',!isIOS() || isStandalone());
-    $('appStatus').textContent=`v1.4.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
+    $('appStatus').textContent=`v1.5.0 • ${isStandalone()?'Home Screen / standalone':'Browser'} • ${navigator.onLine?'Online':'Offline'} • ${offlineReady?'Cache offline siap':'Cache offline belum terkonfirmasi'}`;
   }
   async function registerSW(){
     if(!('serviceWorker' in navigator) || !window.isSecureContext){updateAppStatus();return;}
@@ -736,7 +756,7 @@
       const names=await caches.keys();
       for(const name of names.filter(name=>name.startsWith(`fahmi-daily:${ready.scope}:`))){
         const cache=await caches.open(name);
-        const core=['index.html','styles.css','app.js','google-config.js','google-calendar.js','google-server.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png'];
+        const core=['index.html','styles.css','app.js','google-config.js','google-calendar.js','google-server.js','weather.js','weather-ui.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png'];
         if((await Promise.all(core.map(path=>cache.match(new URL(path,ready.scope).href)))).every(Boolean)){offlineReady=true;break;}
       }
       updateAppStatus();
@@ -876,6 +896,6 @@
   }
 
 
-  setupReminderSettings(); setupEvents(); setupPlatform(); setupGoogleSync(); renderAll(); registerSW(); checkReminders(); setInterval(checkReminders,30000);
+  setupWeather(); setupReminderSettings(); setupEvents(); setupPlatform(); setupGoogleSync(); renderAll(); registerSW(); weatherUI?.refresh(); checkReminders(); setInterval(checkReminders,30000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){renderToday();checkReminders();}});
 })();

@@ -108,5 +108,9 @@ async function test(name,fn){await fn();passed++;console.log('PASS',name)}
  await test('Mismatched server client ID fails before calendar access',async()=>{
   const f=fixture({provider:async()=>({...credentials(),clientId:'different'})});f.controller.configure(clientId);await f.controller.sync();assert.equal(f.calls.length,0);assert(f.statuses.at(-1).error);
  });
+ await test('Outdoor metadata alone does not create duplicate; weather time/cancellation follows sync',async()=>{
+  const f=fixture();await f.connect();const oldId=f.active()[0].id;f.state.events[0].activityType='outdoor';f.state.events[0].weatherLocation={name:'Bandung',latitude:-6.9,longitude:107.6};f.state.events[0].weatherAccepted='risk';await f.controller.sync();assert.equal(f.active().length,1);assert.equal(f.active()[0].id,oldId);
+  f.state.events[0].startTime='16:00';f.state.events[0].endTime='17:00';await f.controller.sync();assert.equal(f.active().length,1);assert(f.active()[0].start.dateTime.includes('T'));f.state.events[0].seriesStatus='cancelled';await f.controller.sync();assert.equal(f.active().length,0);
+ });
  console.log(`${passed} Google Calendar tests passed.`);
 })().catch(error=>{console.error(error);process.exitCode=1});

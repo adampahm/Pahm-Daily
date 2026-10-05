@@ -28,6 +28,7 @@
       <aside id="installHint" class="info-card hidden"><strong>Pasang Fahmi Daily ke iPhone:</strong><p>Tekan tombol Share → Add to Home Screen.</p><button class="soft-btn install-help">Cara Pasang di iPhone</button></aside>
       <aside id="googleSyncBanner" class="calendar-banner" role="status" aria-live="polite"><strong id="googleBannerLabel">Google Calendar · Belum terhubung</strong><button id="calendarSettingsBtn" class="text-btn">Kelola</button></aside>
       <aside id="storageWarning" class="info-card hidden" role="alert"></aside>
+      <aside id="weatherOverviewBanner" class="info-card weather-rain hidden" role="status" aria-live="polite"></aside>
       <aside id="updateNotice" class="info-card hidden"><p>Versi baru siap. Simpan form dan buat backup sebelum memperbarui.</p><button id="updateBtn" class="soft-btn">Perbarui Aplikasi</button></aside>
       <section id="todayPage" class="page active" aria-label="Hari Ini">
         <div id="todayHero"></div>
@@ -131,6 +132,7 @@
           <div id="categoryList" class="stack compact"></div>
         </div>
 
+        <div class="settings-group"><h2>Cuaca Outdoor</h2><p class="muted">Peringatan berdasarkan prakiraan per jam untuk kegiatan Outdoor yang belum selesai.</p><label>Ambang kemungkinan hujan (%)<input id="weatherThreshold" type="number" min="1" max="100" step="1" value="60" inputmode="numeric" /></label><button id="weatherSettingsSaveBtn" class="soft-btn">Simpan Ambang</button><button id="weatherRefreshAllBtn" class="soft-btn">Periksa Cuaca Mendatang</button><p class="muted small">Pemeriksaan berjalan saat aplikasi aktif. Saat aplikasi ditutup, cuaca tidak diperiksa dan peringatan hujan tidak dikirim. Pengingat kalender yang sudah tersinkron tetap mengikuti pengaturan kalender.</p><p class="muted small">Open-Meteo gratis untuk penggunaan pribadi nonkomersial. Tanpa API key. Hasil dapat berubah dan bukan kepastian. <a href="https://open-meteo.com/en/pricing" target="_blank" rel="noopener">Ketentuan layanan</a></p></div>
         <div class="settings-group">
           <h2>Data</h2>
           <div class="settings-card vertical">
@@ -227,6 +229,14 @@
         <label id="untilField" class="hidden">Berakhir pada (opsional)
           <input id="eventUntil" type="date" />
         </label>
+        <label>Jenis kegiatan<select id="eventActivityType"><option value="indoor">Indoor</option><option value="outdoor">Outdoor</option></select></label>
+        <div id="weatherOutdoorFields" class="weather-fields hidden">
+          <label>Cari kota / lokasi<input id="weatherCitySearch" type="search" maxlength="100" placeholder="Contoh: Bandung" autocomplete="off" /></label>
+          <div class="form-grid two"><button type="button" id="weatherSearchBtn" class="soft-btn">Cari Lokasi</button><button type="button" id="weatherLocateBtn" class="soft-btn">Gunakan Lokasi Saya</button></div>
+          <div id="weatherSearchResults" role="status" aria-live="polite"></div><p id="weatherSelectedLocation" class="inline-note"></p>
+          <p class="muted small">Koordinat kegiatan dikirim ke Open-Meteo saat pemeriksaan. Lokasi perangkat hanya diminta melalui tombol di atas. Jam kegiatan mengikuti zona waktu perangkat.</p>
+          <h3>Cuaca kegiatan</h3><div id="weatherFormCard" class="info-card" role="status" aria-live="polite"></div><button type="button" id="weatherRetryBtn" class="soft-btn">Coba Lagi</button>
+        </div>
         <label><span>Lokasi <span class="optional">opsional</span></span>
           <input id="eventLocation" maxlength="120" placeholder="Contoh: KU3.04.07" />
         </label>
@@ -249,6 +259,7 @@
     </div>
   </dialog>
 
+  <dialog id="weatherRiskDialog" class="center-dialog" aria-labelledby="weatherRiskTitle"><div class="modal-card"><h2 id="weatherRiskTitle">Pertimbangkan ulang kegiatan Outdoor</h2><div id="weatherRiskText"></div><div class="modal-actions vertical-actions"><button id="weatherChangeBtn" class="primary-btn">Ubah Waktu</button><button id="weatherKeepBtn" class="soft-btn">Tetap Lanjutkan</button><button id="weatherCancelBtn" class="soft-btn danger">Batalkan Kegiatan</button></div></div></dialog>
   <dialog id="conflictDialog" class="center-dialog">
     <div class="modal-card">
       <div class="warning-icon">!</div>
@@ -300,6 +311,8 @@
   <script src="./google-config.js" defer></script>
   <script src="./google-calendar.js" defer></script>
   <script src="./google-server.js" defer></script>
+  <script src="./weather.js" defer></script>
+  <script src="./weather-ui.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>

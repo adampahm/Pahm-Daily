@@ -15,11 +15,11 @@ vm.createContext(ctx);vm.runInContext(fs.readFileSync(require('path').join(__dir
 const dispatch=async(type,event={})=>{let pending;handlers[type]({...event,waitUntil:p=>pending=p});await pending;};
 const fetchEvent=async(url,mode='cors',method='GET')=>{let response;handlers.fetch({request:{url,mode,method},respondWith:p=>response=p});return response?await response:undefined};
 (async()=>{
-await dispatch('install');assert.equal(assets.length,10);assert(!skip);
+await dispatch('install');assert.equal(assets.length,12);assert(!skip);
 await dispatch('activate');assert(claimed);assert(!stores.has('fahmi-daily-v1'));assert(!stores.has('fahmi-daily:'+scope+':old'));assert(stores.has('other-app-v2'));assert(stores.has('fahmi-daily:https://example.test/another/:old'));
 online=false;
 for(const path of ['','index.html','unknown-route?x=1']){const response=await fetchEvent(scope+path,'navigate');assert((await response.text()).startsWith('<!doctype html>'))}
-for(const path of ['app.js','styles.css','icons/icon-192.png','manifest.webmanifest'])assert(await fetchEvent(scope+path));
+for(const path of ['app.js','styles.css','weather.js','weather-ui.js','icons/icon-192.png','manifest.webmanifest'])assert(await fetchEvent(scope+path));
 assert.equal(await fetchEvent('https://external.test/x'),undefined);assert.equal(await fetchEvent(scope+'secret.json'),undefined);assert.equal(await fetchEvent(scope+'app.js','cors','POST'),undefined);
 handlers.message({data:{type:'SKIP_WAITING'}});assert(skip);
 await dispatch('notificationclick',{notification:{close(){}}});assert(focused);assert.equal(opened,'');
